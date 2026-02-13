@@ -197,7 +197,7 @@ class StubRepository:
 
         for stub in self.stubs:
             match = stub.matches_request(request)
-            if match.strength >= best_strength:
+            if match.strength > best_strength:
                 best_strength = match.strength
                 best_match = match.stub
 
