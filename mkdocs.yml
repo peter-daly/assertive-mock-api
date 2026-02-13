@@ -1,4 +1,4 @@
-site_name: Assertive
+site_name: Assertive Mock API Server
 site_url: https://example.com/
 
 theme: material
@@ -9,8 +9,9 @@ validation:
   unrecognized_links: warn
 
 nav:
-- Home: index.md
-- Criteria: criteria/
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Stubs & Assertions: stubs-and-assertions.md
 
 markdown_extensions:
   - attr_list
@@ -25,8 +26,3 @@ markdown_extensions:
 
 plugins:
   - mkdocstrings
-  - gen-files:
-      scripts:
-        - docs/scripts/gen_criteria_pages.py
-  - literate-nav:
-      nav_file: SUMMARY.md
