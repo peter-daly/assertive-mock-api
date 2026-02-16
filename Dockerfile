@@ -47,9 +47,12 @@ RUN \
 
 RUN \
     --mount=type=bind,source=pyproject.toml,target=/builder/pyproject.toml \
+    --mount=type=bind,source=server/pyproject.toml,target=/builder/server/pyproject.toml \
+    --mount=type=bind,source=server/assertive_mock_api_server,target=/builder/server/assertive_mock_api_server \
+    --mount=type=bind,source=client/pyproject.toml,target=/builder/client/pyproject.toml \
     --mount=type=bind,source=uv.lock,target=/builder/uv.lock \
     --mount=type=cache,target=/root/.cache/uv \
-    uv sync
+    uv sync --frozen --no-dev --package assertive-mock-api-server --no-editable
 
 FROM base AS prod
 
@@ -61,9 +64,10 @@ COPY \
 
 # Copy full application source
 COPY ./pyproject.toml ./uv.lock ${WORKDIR}/
-COPY ./assertive_mock_api_server ${WORKDIR}/assertive_mock_api_server
+COPY ./server/pyproject.toml ${WORKDIR}/server/pyproject.toml
+COPY ./client/pyproject.toml ${WORKDIR}/client/pyproject.toml
+COPY ./server/assertive_mock_api_server ${WORKDIR}/server/assertive_mock_api_server
 
 WORKDIR ${WORKDIR}
 
 ENTRYPOINT [ "python", "-m", "assertive_mock_api_server" ]
-

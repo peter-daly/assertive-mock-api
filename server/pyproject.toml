@@ -1,0 +1,13 @@
+[project]
+name = "assertive-mock-api-server"
+version = "0.1.0"
+description = "Assertive mock API server"
+requires-python = ">=3.10"
+dependencies = [
+    "assertive>=1.2.0",
+    "clean-ioc>=1.15.0",
+    "fastapi>=0.115.12",
+    "httpx>=0.28.1",
+    "pydantic>=2.11.3",
+    "uvicorn>=0.34.1",
+]

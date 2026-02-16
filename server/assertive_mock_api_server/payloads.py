@@ -74,13 +74,17 @@ class ApiAssertionPayload(BaseModel):
         )
 
 
+class CreateScopePayload(BaseModel):
+    name: str = Field(pattern=r"^[A-Za-z0-9_-]+$")
+
+
 class StubProxyPayload(BaseModel):
     """
     A proxy object for stubbing.
     """
 
     url: str
-    headers: dict = {}
+    headers: dict = Field(default_factory=dict)
     timeout: int = 5
 
     @classmethod
@@ -235,7 +239,7 @@ class StubPayload(BaseModel):
     action: StubActionPayload
     max_calls: int | None = None
 
-    def to_stub(self) -> Stub:
+    def to_stub(self, scope: str | None = None) -> Stub:
         """
         Convert the request object to a stub.
         """
@@ -243,6 +247,7 @@ class StubPayload(BaseModel):
         kwargs = {
             "request": self.request.to_stub_request(),
             "action": self.action.to_stub_action(),
+            "scope": scope,
         }
 
         if self.max_calls is not None:
@@ -260,6 +265,7 @@ class StubViewPayload(BaseModel):
 
     request: StubRequestPayload
     action: StubActionPayload
+    scope: str | None = None
 
 
 class StubListViewPayload(BaseModel):
@@ -267,7 +273,7 @@ class StubListViewPayload(BaseModel):
     A response object for stubbing.
     """
 
-    stubs: list[StubViewPayload] = []
+    stubs: list[StubViewPayload] = Field(default_factory=list)
 
     @classmethod
     def from_stubs(cls, stubs: list[Stub]) -> "StubListViewPayload":
@@ -279,6 +285,7 @@ class StubListViewPayload(BaseModel):
                 StubViewPayload(
                     request=StubRequestPayload.from_stub_request(stub.request),
                     action=StubActionPayload.from_stub_action(stub.action),
+                    scope=stub.scope,
                 )
                 for stub in stubs
             ]
@@ -296,6 +303,7 @@ class MockApiRequestViewPayload(BaseModel):
     headers: dict
     body: str | bytes
     host: str
+    scope: str | None = None
 
     @classmethod
     def from_mock_api_request(
@@ -311,6 +319,7 @@ class MockApiRequestViewPayload(BaseModel):
             headers=request.headers,
             body=request.body,
             host=request.host,
+            scope=request.scope,
         )
 
 

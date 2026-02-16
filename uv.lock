@@ -2,6 +2,21 @@ version = 1
 revision = 2
 requires-python = ">=3.10"
 
+[manifest]
+members = [
+    "assertive-mock-api-client",
+    "assertive-mock-api-server",
+]
+
+[manifest.dependency-groups]
+dev = [
+    { name = "mkdocs", specifier = ">=1.6.1" },
+    { name = "mkdocs-gen-files", specifier = ">=0.5.0" },
+    { name = "pyright", specifier = ">=1.1.403" },
+    { name = "pytest", specifier = ">=8.4.1" },
+    { name = "ruff", specifier = ">=0.12.5" },
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -39,9 +54,26 @@ wheels = [
 ]
 
 [[package]]
+name = "assertive-mock-api-client"
+version = "0.1.0"
+source = { virtual = "client" }
+dependencies = [
+    { name = "assertive" },
+    { name = "httpx" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "assertive", specifier = ">=1.2.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pydantic", specifier = ">=2.11.3" },
+]
+
+[[package]]
 name = "assertive-mock-api-server"
 version = "0.1.0"
-source = { virtual = "." }
+source = { virtual = "server" }
 dependencies = [
     { name = "assertive" },
     { name = "clean-ioc" },
@@ -49,15 +81,6 @@ dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "uvicorn" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "mkdocs" },
-    { name = "mkdocs-gen-files" },
-    { name = "pyright" },
-    { name = "pytest" },
-    { name = "ruff" },
 ]
 
 [package.metadata]
@@ -68,15 +91,6 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "pydantic", specifier = ">=2.11.3" },
     { name = "uvicorn", specifier = ">=0.34.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "mkdocs", specifier = ">=1.6.1" },
-    { name = "mkdocs-gen-files", specifier = ">=0.5.0" },
-    { name = "pyright", specifier = ">=1.1.403" },
-    { name = "pytest", specifier = ">=8.4.1" },
-    { name = "ruff", specifier = ">=0.12.5" },
 ]
 
 [[package]]

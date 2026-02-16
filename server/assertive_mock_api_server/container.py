@@ -1,5 +1,11 @@
 from clean_ioc import Container, Lifespan
-from .core import RequestLog, ResponseGenerator, StubRepository, MockApiServer
+from .core import (
+    MockApiServer,
+    RequestLog,
+    ResponseGenerator,
+    ScopeRepository,
+    StubRepository,
+)
 import httpx
 
 
@@ -17,6 +23,7 @@ def get_container():
     container.register(MockApiServer, lifespan=Lifespan.singleton)
     container.register(StubRepository, lifespan=Lifespan.singleton)
     container.register(RequestLog, lifespan=Lifespan.singleton)
+    container.register(ScopeRepository, lifespan=Lifespan.singleton)
     container.register(ResponseGenerator, lifespan=Lifespan.singleton)
     container.register(
         httpx.AsyncClient,

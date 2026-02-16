@@ -3,40 +3,40 @@
 
 install-deps:
 	@echo "Installing dependencies..."
-	@uv sync --no-dev
+	@uv sync --all-packages --no-dev
 
 
 install-dev-deps:
 	@echo "Installing development dependencies..."
-	@uv sync
+	@uv sync --all-packages --group dev
 
 
 fixup:
 	@echo "Fixing up..."
-	@uv run ruff check . --fix
-	@uv run ruff format .
+	@uv run --group dev ruff check . --fix
+	@uv run --group dev ruff format .
 
 typecheck:
 	@echo "Typechecking"
-	@uv run pyright .
+	@uv run --group dev pyright .
 
 
 lint:
 	@echo "Linting with Ruff..."
-	@uv run ruff check .
+	@uv run --group dev ruff check .
 
 format:
 	@echo "Formatting with Ruff..."
-	@uv run ruff format .
+	@uv run --group dev ruff format .
 
 test:
 	@echo "Running tests..."
-	@uv run pytest .
+	@uv run --group dev pytest .
 
 ci: lint format typecheck test
 
 publish:
 	@echo "Building the package..."
-	@uv build
+	@uv build --package assertive-mock-api-server
 	@echo "Publishing to PyPI..."
 	@uv publish --token $$PYPI_TOKEN
