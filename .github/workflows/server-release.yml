@@ -1,0 +1,76 @@
+name: Release Server Docker Image
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure workflow runs only on main
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "main" ]; then
+            echo "This workflow must run on main. Current ref: ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+
+      - name: Read server version
+        id: version
+        run: |
+          VERSION="$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          pyproject = Path('server/pyproject.toml')
+          data = tomllib.loads(pyproject.read_text())
+          print(data['project']['version'])
+          PY
+          )"
+
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "docker_tag=ghcr.io/${{ github.repository }}:${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "repo_tag=server-v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure server release tag does not already exist
+        run: |
+          TAG="${{ steps.version.outputs.repo_tag }}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag already exists locally: ${TAG}"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag already exists on origin: ${TAG}"
+            exit 1
+          fi
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.version.outputs.docker_tag }}
+
+      - name: Tag repository for server release
+        run: |
+          TAG="${{ steps.version.outputs.repo_tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${TAG}"
+          git push origin "${TAG}"

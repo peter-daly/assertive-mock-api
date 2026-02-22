@@ -1,7 +1,7 @@
 ########
 # BASE #
 ########
-FROM python:3.12-slim AS base
+FROM python:3.13-slim AS base
 
 # Use Bash Strict Mode
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
@@ -63,10 +63,7 @@ COPY \
 
 
 # Copy full application source
-COPY ./pyproject.toml ./uv.lock ${WORKDIR}/
-COPY ./server/pyproject.toml ${WORKDIR}/server/pyproject.toml
-COPY ./client/pyproject.toml ${WORKDIR}/client/pyproject.toml
-COPY ./server/assertive_mock_api_server ${WORKDIR}/server/assertive_mock_api_server
+COPY ./server/assertive_mock_api_server ${WORKDIR}/assertive_mock_api_server
 
 WORKDIR ${WORKDIR}
 

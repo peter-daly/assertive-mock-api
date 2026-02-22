@@ -55,7 +55,7 @@ wheels = [
 
 [[package]]
 name = "assertive-mock-api-client"
-version = "0.1.0"
+version = "1.0.0"
 source = { virtual = "client" }
 dependencies = [
     { name = "assertive" },
@@ -72,7 +72,7 @@ requires-dist = [
 
 [[package]]
 name = "assertive-mock-api-server"
-version = "0.1.0"
+version = "1.0.0"
 source = { virtual = "server" }
 dependencies = [
     { name = "assertive" },

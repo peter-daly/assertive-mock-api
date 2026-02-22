@@ -1,0 +1,73 @@
+name: Release Client Package
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  release-client:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+
+      - name: Read client version
+        id: version
+        run: |
+          VERSION="$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+
+          pyproject = Path("client/pyproject.toml")
+          data = tomllib.loads(pyproject.read_text())
+          print(data["project"]["version"])
+          PY
+          )"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=client-v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify release tag does not already exist
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+            echo "Tag already exists locally: ${TAG}"
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag already exists on origin: ${TAG}"
+            exit 1
+          fi
+
+      - name: Build client package
+        run: |
+          rm -rf dist
+          uv build --package assertive-mock-api-client
+
+      - name: Publish client package to PyPI
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          uv publish --token "${PYPI_TOKEN}"
+
+      - name: Tag repository for client release
+        run: |
+          TAG="${{ steps.version.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "${TAG}"
+          git push origin "${TAG}"

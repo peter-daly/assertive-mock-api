@@ -1,6 +1,6 @@
 [project]
 name = "assertive-mock-api-client"
-version = "0.1.0"
+version = "1.0.0"
 description = "Client package for assertive mock API"
 requires-python = ">=3.10"
 dependencies = [
