@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   workflow_call:
 
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/server
+
+
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
@@ -38,7 +42,6 @@ jobs:
           )"
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "docker_tag=ghcr.io/${{ github.repository }}:${VERSION}" >> "$GITHUB_OUTPUT"
           echo "repo_tag=server-v${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Ensure server release tag does not already exist
@@ -60,12 +63,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw, value=${{ steps.version.outputs.version }}
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ steps.version.outputs.docker_tag }}
+          tags: |
+            ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
       - name: Tag repository for server release
         run: |
