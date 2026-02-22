@@ -1,4 +1,4 @@
-.PHONY: fixup lint format test ci
+.PHONY: fixup lint format test ci docs-serve docs-build
 
 
 install-deps:
@@ -34,6 +34,14 @@ test:
 	@uv run --group dev pytest .
 
 ci: lint format typecheck test
+
+docs-serve:
+	@echo "Serving docs..."
+	@uv run --group dev mkdocs serve
+
+docs-build:
+	@echo "Building docs..."
+	@uv run --group dev mkdocs build --strict
 
 publish:
 	@echo "Building the package..."

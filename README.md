@@ -27,5 +27,27 @@ Notes:
 - Scoped client calls send the scope as a header key with value `"1"` by default.
 - Nested scopes on the same root client are not supported.
 
+## Docs
+
+Documentation is built with MkDocs Material and deployed to GitHub Pages via the
+artifact-based workflow in `.github/workflows/docs-pages.yml`.
+
+### Local docs commands
+
+```bash
+make docs-serve
+```
+
+```bash
+make docs-build
+```
+
+### Deployment behavior
+
+- Pushes to `main` trigger docs build + publish.
+- Manual reruns are supported via `workflow_dispatch`.
+- Deployment uses `actions/upload-pages-artifact` and `actions/deploy-pages`.
+- No `gh-pages` branch and no `mkdocs gh-deploy` are used.
+
 
 <img width="3840" height="1062" alt="image" src="https://github.com/user-attachments/assets/c3045aee-5bca-4f06-87b5-3be9496d121d" />
