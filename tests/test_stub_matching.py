@@ -140,3 +140,54 @@ class TestStubMatching:
 
         # Assert
         assert result is None
+
+    def test_stubs_have_unique_ids(self):
+        repo = StubRepository()
+        stub_a = Stub(
+            request=StubRequest(path=is_eq("/a")),
+            action=StubAction(
+                response=StubResponse(status_code=200, headers={}, body="a")
+            ),
+        )
+        stub_b = Stub(
+            request=StubRequest(path=is_eq("/b")),
+            action=StubAction(
+                response=StubResponse(status_code=200, headers={}, body="b")
+            ),
+        )
+
+        repo.add(stub_a)
+        repo.add(stub_b)
+
+        assert stub_a.stub_id != stub_b.stub_id
+        assert bool(stub_a.stub_id)
+        assert bool(stub_b.stub_id)
+
+    def test_delete_by_id_removes_stub(self):
+        repo = StubRepository()
+        stub = Stub(
+            request=StubRequest(path=is_eq("/to-delete")),
+            action=StubAction(
+                response=StubResponse(status_code=200, headers={}, body="gone")
+            ),
+        )
+        repo.add(stub)
+
+        assert repo.delete_by_id(stub.stub_id) is True
+        assert (
+            repo.find_best_match(
+                MockApiRequest(
+                    path="/to-delete",
+                    method="GET",
+                    headers={},
+                    body=None,
+                    host="localhost",
+                    query={},
+                )
+            )
+            is None
+        )
+
+    def test_delete_by_id_returns_false_for_missing_stub(self):
+        repo = StubRepository()
+        assert repo.delete_by_id("missing-stub-id") is False

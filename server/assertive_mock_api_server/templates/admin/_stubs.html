@@ -1,0 +1,54 @@
+<h2>Stubs</h2>
+
+{% if error %}
+<p style="color:#b00;"><strong>Error:</strong> {{ error }}</p>
+{% endif %}
+
+<p>
+  <a href="/__admin__/stubs/new"><strong>Create New Stub</strong></a>
+  using a guided multi-step form.
+</p>
+
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+  <thead>
+    <tr>
+      <th>Stub ID</th>
+      <th>Scope</th>
+      <th>Request</th>
+      <th>Action</th>
+      <th>Delete</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for stub in stubs %}
+    <tr>
+      <td><code><a href="/__admin__/stubs/{{ stub.stub_id }}">{{ stub.stub_id }}</a></code></td>
+      <td>{% if stub.scope %}<a href="/__admin__/scopes/{{ stub.scope }}">{{ stub.scope }}</a>{% else %}-{% endif %}</td>
+      <td>
+        <code>{{ stub.request.method or "*" }}</code>
+        <code>{{ stub.request.path or "*" }}</code>
+      </td>
+      <td>
+        {% if stub.action.response %}
+          response
+        {% elif stub.action.proxy %}
+          proxy
+        {% elif stub.action.sse %}
+          sse
+        {% else %}
+          unknown
+        {% endif %}
+      </td>
+      <td>
+        <button
+          hx-delete="/__admin__/actions/stubs/{{ stub.stub_id }}"
+          hx-target="#stubs-panel"
+          hx-swap="innerHTML"
+        >
+          Delete
+        </button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

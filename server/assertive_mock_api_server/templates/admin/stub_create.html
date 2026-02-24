@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create Stub | Mock API Admin</title>
+  <style>
+    :root {
+      --bg: #f3f6f9;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #4b5563;
+      --accent: #0369a1;
+      --accent-soft: #e0f2fe;
+      --danger: #b91c1c;
+      --border: #dbe3ec;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 1.5rem;
+      background: radial-gradient(circle at top right, #dbeafe 0%, var(--bg) 50%);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+    }
+
+    .page {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .header a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+    }
+
+    .stepper {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .stepper button {
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      color: var(--muted);
+      padding: 0.5rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .stepper button.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .step {
+      display: none;
+      animation: fade-in 200ms ease-out;
+    }
+
+    .step.active { display: block; }
+
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-top: 0.75rem;
+    }
+
+    .hint {
+      margin: 0.2rem 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      margin-top: 0.35rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem;
+      font: inherit;
+      color: inherit;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .notice {
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+      display: none;
+    }
+
+    .notice.error {
+      border-color: #fecaca;
+      background: #fef2f2;
+      color: var(--danger);
+      display: block;
+    }
+
+    .notice.success {
+      border-color: #bbf7d0;
+      background: #f0fdf4;
+      color: #166534;
+      display: block;
+    }
+
+    .action-choice {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+
+    .action-choice button {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: #f8fafc;
+      color: var(--text);
+      padding: 0.6rem;
+      cursor: pointer;
+    }
+
+    .action-choice button.selected {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .actions button {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 0.9rem;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .actions .primary {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .actions button[disabled] {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .helper-group {
+      margin-top: 0.35rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .helper-chip {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 0.3rem 0.6rem;
+      background: #f8fafc;
+      color: var(--text);
+      font-size: 0.8rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .helper-chip:hover,
+    .helper-chip:focus {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      outline: none;
+    }
+
+    code {
+      background: #f1f5f9;
+      border-radius: 6px;
+      padding: 0.2rem 0.35rem;
+    }
+
+    @media (max-width: 760px) {
+      .row,
+      .stepper,
+      .action-choice {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <h1>Create a Stub</h1>
+      <a href="/__admin__">Back to Admin</a>
+    </div>
+
+    <div class="card">
+      <p id="submission-message" class="notice"></p>
+
+      <form id="stub-form" novalidate>
+        <div class="stepper" role="tablist" aria-label="Stub creation steps">
+          <button type="button" class="step-indicator active" data-step-target="0">1. Match</button>
+          <button type="button" class="step-indicator" data-step-target="1">2. Action</button>
+          <button type="button" class="step-indicator" data-step-target="2">3. Details</button>
+          <button type="button" class="step-indicator" data-step-target="3">4. Review</button>
+        </div>
+
+        <section class="step active" data-step="0">
+          <h2>Request Match</h2>
+          <p class="hint">Set simple request match values for path, method, headers, query, and body.</p>
+
+          <div class="row">
+            <label>
+              Scope (optional)
+              <input type="text" id="ui-scope" placeholder="team_a" />
+            </label>
+            <label>
+              Host matcher (optional)
+              <input type="text" id="ui-host" placeholder="localhost" />
+            </label>
+          </div>
+
+          <div class="row">
+            <label>
+              Path matcher
+              <input type="text" id="ui-path" placeholder="/example" />
+            </label>
+            <label>
+              Method matcher
+              <input type="text" id="ui-method" placeholder="GET" />
+            </label>
+          </div>
+
+          <label>
+            Request headers matcher (optional)
+            <div class="helper-group" data-target-textarea="ui-request-headers" aria-label="Common headers for request matcher">
+              <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="application/json">Content-Type: application/json</button>
+              <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="text/plain">Content-Type: text/plain</button>
+              <button type="button" class="helper-chip" data-header-key="Accept" data-header-value="application/json">Accept: application/json</button>
+              <button type="button" class="helper-chip" data-header-key="Authorization" data-header-value="Bearer &lt;token&gt;">Authorization: Bearer &lt;token&gt;</button>
+              <button type="button" class="helper-chip" data-header-key="Cache-Control" data-header-value="no-store">Cache-Control: no-store</button>
+              <button type="button" class="helper-chip" data-header-key="X-Request-Id" data-header-value='{"$regex":"^[A-Za-z0-9-]+$"}' aria-label='X-Request-Id regex helper'>X-Request-Id: regex</button>
+            </div>
+            <p class="hint"><strong>Common headers:</strong> click a chip to insert or replace that header line.</p>
+            <textarea id="ui-request-headers" placeholder="X-Team: qa&#10;X-Request-Id: req-123"></textarea>
+            <p class="hint">One line per header using <code>Header: value</code>.</p>
+          </label>
+
+          <label>
+            Query matcher (optional)
+            <textarea id="ui-query" placeholder="q=abc&#10;page=1"></textarea>
+            <p class="hint">One line per query key using <code>name=value</code>.</p>
+          </label>
+
+          <label>
+            Body matcher (optional)
+            <textarea id="ui-body" placeholder="plain text request body"></textarea>
+          </label>
+
+          <label>
+            Max Calls (optional)
+            <input type="number" id="ui-max-calls" min="1" />
+          </label>
+        </section>
+
+        <section class="step" data-step="1">
+          <h2>Action Type</h2>
+          <p class="hint">Choose how the stub should respond when matched.</p>
+
+          <input type="hidden" id="ui-action-type" value="response" />
+
+          <div class="action-choice" role="radiogroup" aria-label="Action type">
+            <button type="button" data-action="response">Response</button>
+            <button type="button" data-action="proxy">Proxy</button>
+            <button type="button" data-action="sse">SSE</button>
+          </div>
+        </section>
+
+        <section class="step" data-step="2">
+          <h2>Action Details</h2>
+          <p class="hint">This is UI-only input. It will be transformed into the final JSON payload.</p>
+          <div class="row">
+            <label>
+              Base Delay (ms)
+              <input type="number" id="ui-chaos-delay-ms" min="0" placeholder="0" />
+            </label>
+            <label>
+              Jitter (ms)
+              <input type="number" id="ui-chaos-jitter-ms" min="0" value="0" />
+            </label>
+          </div>
+          <p class="hint">Chaos latency is sampled from <code>[base, base + jitter]</code> ms for each matched request.</p>
+
+          <div data-action-section="response">
+            <label>
+              Response Status Code
+              <input type="number" id="ui-response-status" value="200" />
+            </label>
+            <label>
+              Response Headers
+              <div class="helper-group" data-target-textarea="ui-response-headers" aria-label="Common response headers">
+                <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="application/json">Content-Type: application/json</button>
+                <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="text/plain">Content-Type: text/plain</button>
+                <button type="button" class="helper-chip" data-header-key="Accept" data-header-value="application/json">Accept: application/json</button>
+                <button type="button" class="helper-chip" data-header-key="Authorization" data-header-value="Bearer &lt;token&gt;">Authorization: Bearer &lt;token&gt;</button>
+                <button type="button" class="helper-chip" data-header-key="Cache-Control" data-header-value="no-store">Cache-Control: no-store</button>
+                <button type="button" class="helper-chip" data-header-key="X-Request-Id" data-header-value='{"$regex":"^[A-Za-z0-9-]+$"}' aria-label='X-Request-Id regex helper'>X-Request-Id: regex</button>
+              </div>
+              <p class="hint"><strong>Common headers:</strong> click a chip to insert or replace that header line.</p>
+              <textarea id="ui-response-headers" placeholder="Content-Type: application/json&#10;Cache-Control: no-store"></textarea>
+              <p class="hint">Optional. One header per line using <code>Header: value</code>.</p>
+            </label>
+            <label>
+              Response Body
+              <textarea id="ui-response-body"></textarea>
+            </label>
+            <label>
+              Response Template Body (optional)
+              <textarea id="ui-response-template-body" placeholder="hello {{ request.path }}"></textarea>
+            </label>
+          </div>
+
+          <div data-action-section="proxy">
+            <label>
+              Proxy URL
+              <input type="text" id="ui-proxy-url" placeholder="https://example.com" />
+            </label>
+            <label>
+              Proxy Headers
+              <div class="helper-group" data-target-textarea="ui-proxy-headers" aria-label="Common proxy headers">
+                <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="application/json">Content-Type: application/json</button>
+                <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="text/plain">Content-Type: text/plain</button>
+                <button type="button" class="helper-chip" data-header-key="Accept" data-header-value="application/json">Accept: application/json</button>
+                <button type="button" class="helper-chip" data-header-key="Authorization" data-header-value="Bearer &lt;token&gt;">Authorization: Bearer &lt;token&gt;</button>
+                <button type="button" class="helper-chip" data-header-key="Cache-Control" data-header-value="no-store">Cache-Control: no-store</button>
+                <button type="button" class="helper-chip" data-header-key="X-Request-Id" data-header-value='{"$regex":"^[A-Za-z0-9-]+$"}' aria-label='X-Request-Id regex helper'>X-Request-Id: regex</button>
+              </div>
+              <p class="hint"><strong>Common headers:</strong> click a chip to insert or replace that header line.</p>
+              <textarea id="ui-proxy-headers" placeholder="Authorization: Bearer token"></textarea>
+              <p class="hint">Optional. One header per line using <code>Header: value</code>.</p>
+            </label>
+            <label>
+              Proxy Timeout (seconds)
+              <input type="number" id="ui-proxy-timeout" value="5" min="1" />
+            </label>
+          </div>
+
+          <div data-action-section="sse">
+            <label>
+              SSE Default Delay (ms)
+              <input type="number" id="ui-sse-default-delay" value="0" min="0" />
+            </label>
+            <label>
+              SSE Events
+              <textarea id="ui-sse-events" placeholder="id=1; event=message; data=hello&#10;event=message; data=done; delay_ms=500">id=1; event=message; data=hello</textarea>
+              <p class="hint">One event per line. Supported keys: <code>id</code>, <code>event</code>, <code>data</code>, <code>retry</code>, <code>delay_ms</code>.</p>
+            </label>
+          </div>
+        </section>
+
+        <section class="step" data-step="3">
+          <h2>Review</h2>
+          <p class="hint">This JSON is what will be sent to <code>/__mock__/stubs</code>.</p>
+          <pre id="review-output"></pre>
+        </section>
+
+        <div class="actions">
+          <button type="button" id="back-btn">Back</button>
+          <button type="button" id="next-btn" class="primary">Next</button>
+          <button type="submit" id="submit-btn" class="primary" style="display:none;">Create Stub (JSON API)</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const form = document.getElementById("stub-form");
+      const steps = Array.from(document.querySelectorAll(".step"));
+      const indicators = Array.from(document.querySelectorAll(".step-indicator"));
+      const backBtn = document.getElementById("back-btn");
+      const nextBtn = document.getElementById("next-btn");
+      const submitBtn = document.getElementById("submit-btn");
+      const actionTypeInput = document.getElementById("ui-action-type");
+      const actionButtons = Array.from(document.querySelectorAll("[data-action]"));
+      const actionSections = Array.from(document.querySelectorAll("[data-action-section]"));
+      const helperGroups = Array.from(document.querySelectorAll(".helper-group"));
+      const reviewOutput = document.getElementById("review-output");
+      const message = document.getElementById("submission-message");
+      let currentStep = 0;
+
+      function setMessage(type, text) {
+        message.className = "notice " + type;
+        message.textContent = text;
+      }
+
+      function clearMessage() {
+        message.className = "notice";
+        message.textContent = "";
+      }
+
+      function parseMaybeJson(rawValue) {
+        const value = rawValue.trim();
+        if (!value) {
+          return "";
+        }
+        const first = value[0];
+        const mightBeJson = first === "{" || first === "[" || first === '"' || /^-?\d/.test(first) || value === "true" || value === "false" || value === "null";
+        if (!mightBeJson) {
+          return value;
+        }
+        try {
+          return JSON.parse(value);
+        } catch (_) {
+          return value;
+        }
+      }
+
+      function parseKeyValueLines(text, primaryDelimiter, secondaryDelimiter, fieldLabel) {
+        const parsed = {};
+        const lines = text.split(/\r?\n/);
+        for (let i = 0; i < lines.length; i += 1) {
+          const raw = lines[i].trim();
+          if (!raw) {
+            continue;
+          }
+
+          let delimiter = raw.includes(primaryDelimiter) ? primaryDelimiter : null;
+          if (!delimiter && secondaryDelimiter && raw.includes(secondaryDelimiter)) {
+            delimiter = secondaryDelimiter;
+          }
+          if (!delimiter) {
+            throw new Error(fieldLabel + " line " + (i + 1) + " must contain '" + primaryDelimiter + "'");
+          }
+
+          const parts = raw.split(delimiter);
+          const key = parts.shift().trim();
+          const valueText = parts.join(delimiter).trim();
+          if (!key) {
+            throw new Error(fieldLabel + " line " + (i + 1) + " has an empty key");
+          }
+          parsed[key] = parseMaybeJson(valueText);
+        }
+        return parsed;
+      }
+
+      function parseSseEvents(text) {
+        const events = [];
+        const lines = text.split(/\r?\n/);
+        for (let i = 0; i < lines.length; i += 1) {
+          const line = lines[i].trim();
+          if (!line) {
+            continue;
+          }
+
+          const event = {};
+          const parts = line.replaceAll("|", ";").split(";").map((part) => part.trim()).filter(Boolean);
+          for (const part of parts) {
+            const delimiter = part.includes("=") ? "=" : (part.includes(":") ? ":" : null);
+            if (!delimiter) {
+              if (!("data" in event)) {
+                event.data = part;
+                continue;
+              }
+              throw new Error("SSE events line " + (i + 1) + " has invalid segment '" + part + "'");
+            }
+
+            const tokens = part.split(delimiter);
+            const key = tokens.shift().trim().toLowerCase();
+            const value = tokens.join(delimiter).trim();
+            if (!["id", "event", "data", "retry", "delay_ms"].includes(key)) {
+              throw new Error("SSE events line " + (i + 1) + " has unknown key '" + key + "'");
+            }
+
+            if (key === "retry" || key === "delay_ms") {
+              const numberValue = Number(value);
+              if (!Number.isFinite(numberValue)) {
+                throw new Error("SSE events line " + (i + 1) + " field '" + key + "' must be a number");
+              }
+              event[key] = numberValue;
+            } else {
+              event[key] = value;
+            }
+          }
+
+          if (!("data" in event)) {
+            throw new Error("SSE events line " + (i + 1) + " must include data");
+          }
+          events.push(event);
+        }
+
+        if (events.length === 0) {
+          throw new Error("SSE events must include at least one line");
+        }
+
+        return events;
+      }
+
+      function maybeAssign(obj, key, value) {
+        if (value === null || value === undefined || value === "") {
+          return;
+        }
+        obj[key] = value;
+      }
+
+      function parseNonNegativeInt(rawValue, fieldName) {
+        if (rawValue.trim() === "") {
+          return null;
+        }
+        const parsed = Number(rawValue);
+        if (!Number.isInteger(parsed) || parsed < 0) {
+          throw new Error(fieldName + " must be a non-negative integer.");
+        }
+        return parsed;
+      }
+
+      function normalizeHeaderKey(text) {
+        return text.trim().toLowerCase();
+      }
+
+      function applyHeaderHelper(textarea, key, value) {
+        const lines = textarea.value ? textarea.value.split(/\r?\n/) : [];
+        const newLine = key + ": " + value;
+        const targetKey = normalizeHeaderKey(key);
+        let replaced = false;
+        const nextLines = lines.map((line) => {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            return line;
+          }
+          const delimiterIndex = line.indexOf(":");
+          if (delimiterIndex < 0) {
+            return line;
+          }
+          const existingKey = normalizeHeaderKey(line.slice(0, delimiterIndex));
+          if (!replaced && existingKey === targetKey) {
+            replaced = true;
+            return newLine;
+          }
+          return line;
+        });
+
+        if (!replaced) {
+          nextLines.push(newLine);
+        }
+        textarea.value = nextLines.join("\n").replace(/^\n+/, "");
+      }
+
+      function buildApiPayload() {
+        const pathValue = document.getElementById("ui-path").value.trim();
+        const methodValue = document.getElementById("ui-method").value.trim();
+        const hostValue = document.getElementById("ui-host").value.trim();
+        const bodyValue = document.getElementById("ui-body").value.trim();
+        const headersText = document.getElementById("ui-request-headers").value;
+        const queryText = document.getElementById("ui-query").value;
+        const maxCalls = document.getElementById("ui-max-calls").value.trim();
+        const chaosDelay = document.getElementById("ui-chaos-delay-ms").value;
+        const chaosJitter = document.getElementById("ui-chaos-jitter-ms").value;
+        const actionType = actionTypeInput.value;
+
+        const request = {};
+        maybeAssign(request, "path", parseMaybeJson(pathValue));
+        maybeAssign(request, "method", parseMaybeJson(methodValue));
+        maybeAssign(request, "host", parseMaybeJson(hostValue));
+        maybeAssign(request, "body", parseMaybeJson(bodyValue));
+
+        if (headersText.trim()) {
+          request.headers = parseKeyValueLines(headersText, ":", "=", "Request headers matcher");
+        }
+        if (queryText.trim()) {
+          request.query = parseKeyValueLines(queryText, "=", ":", "Query matcher");
+        }
+
+        const action = {};
+        if (actionType === "response") {
+          const statusCodeRaw = document.getElementById("ui-response-status").value.trim() || "200";
+          const headersRaw = document.getElementById("ui-response-headers").value;
+          const templateBody = document.getElementById("ui-response-template-body").value.trim();
+          const responseBodyRaw = document.getElementById("ui-response-body").value;
+
+          const response = {
+            status_code: Number(statusCodeRaw),
+            headers: headersRaw.trim() ? parseKeyValueLines(headersRaw, ":", "=", "Response headers") : {},
+          };
+
+          if (templateBody) {
+            response.template_body = templateBody;
+          } else {
+            response.body = parseMaybeJson(responseBodyRaw);
+          }
+
+          action.response = response;
+        }
+
+        if (actionType === "proxy") {
+          const proxyUrl = document.getElementById("ui-proxy-url").value.trim();
+          if (!proxyUrl) {
+            throw new Error("Proxy URL is required for proxy action.");
+          }
+
+          const proxyHeadersRaw = document.getElementById("ui-proxy-headers").value;
+          const proxyTimeoutRaw = document.getElementById("ui-proxy-timeout").value.trim() || "5";
+          action.proxy = {
+            url: proxyUrl,
+            headers: proxyHeadersRaw.trim() ? parseKeyValueLines(proxyHeadersRaw, ":", "=", "Proxy headers") : {},
+            timeout: Number(proxyTimeoutRaw),
+          };
+        }
+
+        if (actionType === "sse") {
+          const sseEventsRaw = document.getElementById("ui-sse-events").value;
+          const sseDefaultDelayRaw = document.getElementById("ui-sse-default-delay").value.trim() || "0";
+          action.sse = {
+            events: parseSseEvents(sseEventsRaw),
+            default_delay_ms: Number(sseDefaultDelayRaw),
+          };
+        }
+
+        const payload = { request, action };
+        if (maxCalls) {
+          payload.max_calls = Number(maxCalls);
+        }
+        const delayMs = parseNonNegativeInt(chaosDelay, "Base delay");
+        const jitterMs = parseNonNegativeInt(chaosJitter, "Jitter");
+        if (delayMs !== null || jitterMs !== null) {
+          payload.chaos = {
+            latency: {
+              base_ms: delayMs === null ? 0 : delayMs,
+              jitter_ms: jitterMs === null ? 0 : jitterMs,
+            },
+          };
+        }
+
+        return payload;
+      }
+
+      async function assertScopeExists(scopeName) {
+        if (!scopeName) {
+          return;
+        }
+
+        const response = await fetch("/__mock__/scopes", { method: "GET" });
+        if (!response.ok) {
+          throw new Error("Failed to verify scope. Status " + response.status);
+        }
+
+        const data = await response.json();
+        const scopes = Array.isArray(data.scopes) ? data.scopes : [];
+        if (!scopes.includes(scopeName.toLowerCase())) {
+          throw new Error("Scope '" + scopeName + "' does not exist");
+        }
+      }
+
+      async function submitToApi(payload) {
+        const scopeName = document.getElementById("ui-scope").value.trim();
+        await assertScopeExists(scopeName);
+
+        const headers = {
+          "Content-Type": "application/json",
+        };
+        if (scopeName) {
+          headers[scopeName.toLowerCase()] = "1";
+        }
+
+        const response = await fetch("/__mock__/stubs", {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const bodyText = await response.text();
+          throw new Error("Stub create failed (" + response.status + "): " + bodyText);
+        }
+      }
+
+      function updateActionSections() {
+        const type = actionTypeInput.value;
+        actionButtons.forEach((button) => {
+          button.classList.toggle("selected", button.dataset.action === type);
+        });
+        actionSections.forEach((section) => {
+          section.style.display = section.dataset.actionSection === type ? "block" : "none";
+        });
+      }
+
+      function buildReview() {
+        const payload = buildApiPayload();
+        reviewOutput.textContent = JSON.stringify(payload, null, 2);
+      }
+
+      function validateCurrentStep() {
+        if (currentStep === 2 && actionTypeInput.value === "proxy") {
+          const proxyUrl = document.getElementById("ui-proxy-url").value.trim();
+          if (!proxyUrl) {
+            setMessage("error", "Proxy URL is required for proxy action.");
+            return false;
+          }
+        }
+
+        if (currentStep === 2 && actionTypeInput.value === "sse") {
+          const sseEvents = document.getElementById("ui-sse-events").value.trim();
+          if (!sseEvents) {
+            setMessage("error", "At least one SSE event line is required for SSE action.");
+            return false;
+          }
+        }
+
+        try {
+          buildApiPayload();
+        } catch (error) {
+          setMessage("error", error.message);
+          return false;
+        }
+
+        clearMessage();
+        return true;
+      }
+
+      function renderStep() {
+        steps.forEach((step, index) => step.classList.toggle("active", index === currentStep));
+        indicators.forEach((indicator, index) => indicator.classList.toggle("active", index === currentStep));
+
+        backBtn.style.visibility = currentStep === 0 ? "hidden" : "visible";
+        nextBtn.style.display = currentStep === steps.length - 1 ? "none" : "inline-block";
+        submitBtn.style.display = currentStep === steps.length - 1 ? "inline-block" : "none";
+
+        if (currentStep === steps.length - 1) {
+          try {
+            buildReview();
+            clearMessage();
+          } catch (error) {
+            setMessage("error", error.message);
+          }
+        }
+      }
+
+      backBtn.addEventListener("click", () => {
+        if (currentStep > 0) {
+          currentStep -= 1;
+          renderStep();
+        }
+      });
+
+      nextBtn.addEventListener("click", () => {
+        if (!validateCurrentStep()) {
+          return;
+        }
+        if (currentStep < steps.length - 1) {
+          currentStep += 1;
+          renderStep();
+        }
+      });
+
+      indicators.forEach((indicator) => {
+        indicator.addEventListener("click", () => {
+          const target = Number(indicator.dataset.stepTarget);
+          if (Number.isNaN(target)) {
+            return;
+          }
+          if (target > currentStep && !validateCurrentStep()) {
+            return;
+          }
+          currentStep = target;
+          renderStep();
+        });
+      });
+
+      actionButtons.forEach((button) => {
+        button.addEventListener("click", () => {
+          actionTypeInput.value = button.dataset.action;
+          updateActionSections();
+        });
+      });
+
+      helperGroups.forEach((group) => {
+        const textareaId = group.dataset.targetTextarea;
+        const textarea = document.getElementById(textareaId);
+        if (!textarea) {
+          return;
+        }
+        const chips = Array.from(group.querySelectorAll(".helper-chip"));
+        chips.forEach((chip) => {
+          chip.addEventListener("click", () => {
+            const key = chip.dataset.headerKey || "";
+            const value = chip.dataset.headerValue || "";
+            if (!key) {
+              return;
+            }
+            applyHeaderHelper(textarea, key, value);
+          });
+        });
+      });
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!validateCurrentStep()) {
+          return;
+        }
+
+        const payload = buildApiPayload();
+        submitBtn.disabled = true;
+        clearMessage();
+
+        try {
+          await submitToApi(payload);
+          setMessage("success", "Stub created successfully via /__mock__/stubs");
+          form.reset();
+          actionTypeInput.value = "response";
+          document.getElementById("ui-sse-events").value = "id=1; event=message; data=hello";
+          document.getElementById("ui-response-status").value = "200";
+          document.getElementById("ui-proxy-timeout").value = "5";
+          document.getElementById("ui-sse-default-delay").value = "0";
+          document.getElementById("ui-chaos-delay-ms").value = "";
+          document.getElementById("ui-chaos-jitter-ms").value = "0";
+          currentStep = 0;
+          updateActionSections();
+          renderStep();
+        } catch (error) {
+          setMessage("error", error.message);
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      updateActionSections();
+      renderStep();
+    }());
+  </script>
+</body>
+</html>

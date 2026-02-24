@@ -1,0 +1,36 @@
+{
+    "stubs": [
+        {
+            "request": {
+                "path": "/example"
+            },
+            "action": {
+                "response": {
+                    "status_code": 200,
+                    "headers": {
+                        "Content-Type": "application/json"
+                    },
+                    "body": {
+                        "hello": "world"
+                    }
+                }
+            }
+        },
+        {
+            "request": {
+                "path": "/example/earth"
+            },
+            "action": {
+                "response": {
+                    "status_code": 200,
+                    "headers": {
+                        "Content-Type": "application/json"
+                    },
+                    "body": {
+                        "hello": "earth"
+                    }
+                }
+            }
+        }
+    ]
+}

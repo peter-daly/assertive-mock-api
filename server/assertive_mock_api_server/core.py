@@ -2,13 +2,18 @@
 This is a test bed for the assertive-mock-api.
 """
 
+import asyncio
+import random
 import re
 from dataclasses import dataclass, field
 from typing import Any
+from uuid import uuid4
 
 import httpx
 from assertive import Criteria, is_gte
 from pydantic import model_validator
+
+from .templating import render_template
 
 PRACTICALLY_INFINITE = 2**31
 SCOPE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -43,6 +48,7 @@ class MockApiRequest:
     host: str
     query: dict
     scope: str | None = None
+    matched_stub_id: str | None = None
 
 
 @dataclass(kw_only=True)
@@ -101,7 +107,15 @@ class StubResponse:
 
     status_code: int
     headers: dict
-    body: Any
+    body: Any | None = None
+    template_body: str | None = None
+
+    def __post_init__(self) -> None:
+        has_body = self.body is not None
+        has_template_body = self.template_body is not None
+
+        if has_body == has_template_body:
+            raise ValueError("Exactly one of body or template_body must be provided.")
 
     class Config:
         arbitrary_types_allowed = True
@@ -122,6 +136,33 @@ class StubProxy:
 
 
 @dataclass(kw_only=True)
+class SseEvent:
+    data: str
+    event: str | None = None
+    id: str | None = None
+    retry: int | None = None
+    delay_ms: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.retry is not None and self.retry < 0:
+            raise ValueError("retry must be >= 0")
+        if self.delay_ms is not None and self.delay_ms < 0:
+            raise ValueError("delay_ms must be >= 0")
+
+
+@dataclass(kw_only=True)
+class SseStream:
+    events: list[SseEvent]
+    default_delay_ms: int = 0
+
+    def __post_init__(self) -> None:
+        if not self.events:
+            raise ValueError("events must not be empty")
+        if self.default_delay_ms < 0:
+            raise ValueError("default_delay_ms must be >= 0")
+
+
+@dataclass(kw_only=True)
 class StubAction:
     """
     A stub action object for testing purposes.
@@ -129,20 +170,44 @@ class StubAction:
 
     response: StubResponse | None = None
     proxy: StubProxy | None = None
+    sse: SseStream | None = None
+
+    def __post_init__(self) -> None:
+        configured_actions = [self.response, self.proxy, self.sse]
+        configured_count = sum(1 for action in configured_actions if action is not None)
+        if configured_count != 1:
+            raise ValueError("Exactly one of response, proxy, or sse must be provided.")
 
     @model_validator(mode="after")
     def _validate_response_and_proxy(self):
         """
         Validates the action object.
         """
-        if self.response is None and self.proxy is None:
-            raise ValueError("Either response or proxy must be provided.")
-        if self.response is not None and self.proxy is not None:
-            raise ValueError("Only one of response or proxy can be provided.")
+        configured_actions = [self.response, self.proxy, self.sse]
+        configured_count = sum(1 for action in configured_actions if action is not None)
+        if configured_count != 1:
+            raise ValueError("Exactly one of response, proxy, or sse must be provided.")
         return self
 
     class Config:
         arbitrary_types_allowed = True
+
+
+@dataclass(kw_only=True)
+class StubDelay:
+    base_ms: int = 0
+    jitter_ms: int = 0
+
+    def __post_init__(self) -> None:
+        if self.base_ms < 0:
+            raise ValueError("base_ms must be >= 0")
+        if self.jitter_ms < 0:
+            raise ValueError("jitter_ms must be >= 0")
+
+
+@dataclass(kw_only=True)
+class StubChaos:
+    latency: StubDelay = field(default_factory=StubDelay)
 
 
 @dataclass(kw_only=True)
@@ -160,9 +225,11 @@ class Stub:
     request: StubRequest
     action: StubAction
 
+    stub_id: str = field(default_factory=lambda: str(uuid4()))
     call_count: int = 0
     max_calls: int = PRACTICALLY_INFINITE
     scope: str | None = None
+    chaos: StubChaos | None = None
 
     def matches_request(self, request: MockApiRequest) -> StubMatch:
         """
@@ -271,6 +338,27 @@ class StubRepository:
     def delete_scope(self, scope: str) -> None:
         self.scoped_stubs.pop(scope, None)
 
+    def delete_by_id(self, stub_id: str, scope: str | None = None) -> bool:
+        if scope is None:
+            for index, stub in enumerate(self.global_stubs):
+                if stub.stub_id == stub_id:
+                    del self.global_stubs[index]
+                    return True
+            return False
+
+        scoped_items = self.scoped_stubs.get(scope, [])
+        for index, stub in enumerate(scoped_items):
+            if stub.stub_id == stub_id:
+                del scoped_items[index]
+                return True
+
+        for index, stub in enumerate(self.global_stubs):
+            if stub.stub_id == stub_id:
+                del self.global_stubs[index]
+                return True
+
+        return False
+
     def find_best_match(self, request: MockApiRequest) -> Stub | None:
         """
         Finds the best match for the given request.
@@ -314,6 +402,61 @@ class MockApiResponse:
         )
 
 
+@dataclass(kw_only=True)
+class MockApiSseResponse:
+    events: list[SseEvent]
+    default_delay_ms: int = 0
+
+
+def resolve_stub_delay_ms(stub: Stub) -> int:
+    if stub.chaos is None:
+        return 0
+    if stub.chaos.latency.jitter_ms == 0:
+        return stub.chaos.latency.base_ms
+    return random.randint(
+        stub.chaos.latency.base_ms,
+        stub.chaos.latency.base_ms + stub.chaos.latency.jitter_ms,
+    )
+
+
+def resolve_sse_delay_ms(event: SseEvent, default_delay_ms: int) -> int:
+    if event.delay_ms is not None:
+        return event.delay_ms
+    return default_delay_ms
+
+
+def encode_sse_event(event: SseEvent) -> str:
+    lines: list[str] = []
+
+    if event.id is not None:
+        lines.append(f"id: {event.id}")
+    if event.event is not None:
+        lines.append(f"event: {event.event}")
+    if event.retry is not None:
+        lines.append(f"retry: {event.retry}")
+
+    data_lines = event.data.splitlines() or [""]
+    lines.extend(f"data: {line}" for line in data_lines)
+    lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def render_sse_event_templates(event: SseEvent, request: MockApiRequest) -> SseEvent:
+    rendered_data = render_template(event.data, request)
+    rendered_event = (
+        render_template(event.event, request) if event.event is not None else None
+    )
+    rendered_id = render_template(event.id, request) if event.id is not None else None
+
+    return SseEvent(
+        data=rendered_data,
+        event=rendered_event,
+        id=rendered_id,
+        retry=event.retry,
+        delay_ms=event.delay_ms,
+    )
+
+
 class ResponseGenerator:
     """
     A generator for creating responses.
@@ -322,15 +465,22 @@ class ResponseGenerator:
     def __init__(self, client: httpx.AsyncClient):
         self.client = client
 
-    async def generate(self, stub: Stub, request: MockApiRequest) -> MockApiResponse:
+    async def generate(
+        self, stub: Stub, request: MockApiRequest
+    ) -> MockApiResponse | MockApiSseResponse:
         """
         Generates a response.
         """
         if stub_response := stub.action.response:
+            if stub_response.template_body is not None:
+                response_body = render_template(stub_response.template_body, request)
+            else:
+                response_body = stub_response.body
+
             return MockApiResponse(
                 status_code=stub_response.status_code,
                 headers=stub_response.headers,
-                body=stub_response.body,
+                body=response_body,
             )
 
         if stub_proxy := stub.action.proxy:
@@ -352,13 +502,22 @@ class ResponseGenerator:
                 body=proxied_response.content,
             )
 
-        raise ValueError("No response or proxy found in the stub.")
+        if stub_sse := stub.action.sse:
+            rendered_events = [
+                render_sse_event_templates(event, request) for event in stub_sse.events
+            ]
+            return MockApiSseResponse(
+                events=rendered_events,
+                default_delay_ms=stub_sse.default_delay_ms,
+            )
+
+        raise ValueError("No response, proxy, or sse found in the stub.")
 
 
 @dataclass(kw_only=True)
 class ConfirmResult:
     """
-    A result object for the conform method.
+    A result object for the confirm method.
     """
 
     success: bool
@@ -381,15 +540,23 @@ class MockApiServer:
         self.response_generator = response_generator
         self.scope_repository = scope_repository
 
-    async def handle_request(self, request: MockApiRequest) -> MockApiResponse:
+    async def handle_request(
+        self, request: MockApiRequest
+    ) -> MockApiResponse | MockApiSseResponse:
         """
         Handles the given request and returns a response.
         """
+        best_match = self.stub_repository.find_best_match(request)
+        request.matched_stub_id = best_match.stub_id if best_match is not None else None
         self.request_log.add(request)
 
-        best_match = self.stub_repository.find_best_match(request)
         if best_match is None:
             return MockApiResponse.no_stub_found()
+
+        delay_ms = resolve_stub_delay_ms(best_match)
+        if delay_ms > 0:
+            await asyncio.sleep(delay_ms / 1000)
+
         response = await self.response_generator.generate(best_match, request)
         return response
 
@@ -411,6 +578,9 @@ class MockApiServer:
         Lists all stubs in the repository.
         """
         return self.stub_repository.list_for_scope(scope)
+
+    async def delete_stub(self, stub_id: str, scope: str | None = None) -> bool:
+        return self.stub_repository.delete_by_id(stub_id, scope)
 
     async def list_requests(self, scope: str | None = None) -> list[MockApiRequest]:
         """

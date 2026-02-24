@@ -32,6 +32,10 @@ Notes:
 Documentation is built with MkDocs Material and deployed to GitHub Pages via the
 artifact-based workflow in `.github/workflows/docs-pages.yml`.
 
+## Planning
+
+- [Feature Backlog](FEATURES.md)
+
 ### Local docs commands
 
 ```bash

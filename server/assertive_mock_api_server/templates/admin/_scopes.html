@@ -1,0 +1,73 @@
+<h2>Scopes</h2>
+
+{% if error %}
+<p style="color:#b00;"><strong>Error:</strong> {{ error }}</p>
+{% endif %}
+
+<form id="create-scope-form">
+  <p>
+    <label>New scope name:
+      <input type="text" id="create-scope-name" name="name" placeholder="team_a" required />
+    </label>
+    <button type="submit">Create Scope</button>
+  </p>
+</form>
+<p id="create-scope-error" style="color:#b00;"></p>
+
+<ul>
+  {% for scope in scopes %}
+  <li>
+    <code><a href="/__admin__/scopes/{{ scope }}">{{ scope }}</a></code>
+    <button
+      hx-delete="/__admin__/actions/scopes/{{ scope }}"
+      hx-target="#scopes-panel"
+      hx-swap="innerHTML"
+    >
+      Delete
+    </button>
+  </li>
+  {% endfor %}
+</ul>
+
+<script>
+  (function () {
+    const form = document.getElementById("create-scope-form");
+    const input = document.getElementById("create-scope-name");
+    const errorEl = document.getElementById("create-scope-error");
+    if (!form || !input || !errorEl) {
+      return;
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      errorEl.textContent = "";
+
+      const name = input.value.trim();
+      if (!name) {
+        errorEl.textContent = "Scope name is required.";
+        return;
+      }
+
+      const response = await fetch("/__mock__/scopes", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({name}),
+      });
+
+      if (!response.ok) {
+        try {
+          const payload = await response.json();
+          errorEl.textContent = payload.detail || "Unable to create scope.";
+        } catch (_) {
+          errorEl.textContent = "Unable to create scope.";
+        }
+        return;
+      }
+
+      input.value = "";
+      if (window.htmx) {
+        window.htmx.ajax("GET", "/__admin__/partials/scopes", {target: "#scopes-panel", swap: "innerHTML"});
+      }
+    });
+  }());
+</script>

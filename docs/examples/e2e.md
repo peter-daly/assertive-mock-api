@@ -2,6 +2,26 @@
 
 This page shows both unscoped and scoped end-to-end flows.
 
+## Serializable Criteria Keys
+
+When sending matcher objects, use Assertive serializable keys such as:
+`$gt`, `$gte`, `$lt`, `$lte`, `$between`, `$eq`, `$neq`, `$and`, `$or`, `$xor`, `$not`,
+`$json`, `$contains`, `$contains_exactly`, `$regex`, `$length`, `$key_values`,
+`$exact_key_values`, `$even`, `$odd`, `$ignore_case`.
+
+Criteria objects from `assertive` are also serializable via the client. You can pass
+criteria instances directly, and the client will serialize them automatically.
+
+```python
+from assertive import between
+
+# Client input (Criteria object)
+times = between(1, 3)
+
+# Wire format sent to the API
+# {"times": {"$between": {"lower": 1, "upper": 3, "is_inclusive": true}}}
+```
+
 ## Unscoped Flow
 
 ```python
@@ -80,3 +100,29 @@ sequenceDiagram
   T->>C: context exit
   C->>S: DELETE /__mock__/scopes/payment-suite
 ```
+
+## Chaos Latency Example
+
+```python
+import httpx
+
+httpx.post(
+    "http://localhost:8910/__mock__/stubs",
+    json={
+        "request": {"path": "/slow", "method": "GET"},
+        "action": {
+            "response": {
+                "status_code": 200,
+                "headers": {"Content-Type": "application/json"},
+                "body": {"ok": True},
+            }
+        },
+        "chaos": {"latency": {"base_ms": 100, "jitter_ms": 50}},
+    },
+).raise_for_status()
+
+response = httpx.get("http://localhost:8910/slow")
+assert response.status_code == 200
+```
+
+With this config, each matched call incurs delay sampled from `100..150 ms`.

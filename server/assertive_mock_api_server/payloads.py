@@ -1,15 +1,19 @@
 from typing import Any
 from assertive import Criteria, ensure_criteria, has_key_values
 from assertive.serialize import deserialize, serialize
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .core import (
     MockApiRequest,
     Stub,
     StubAction,
+    StubChaos,
+    StubDelay,
     StubRequest,
     StubProxy,
     StubResponse,
+    SseEvent,
+    SseStream,
     ApiAssertion,
 )
 
@@ -117,7 +121,17 @@ class StubResponsePayload(BaseModel):
 
     status_code: int
     headers: dict
-    body: Any
+    body: Any | None = None
+    template_body: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_body_xor_template_body(self):
+        has_body = self.body is not None
+        has_template_body = self.template_body is not None
+
+        if has_body == has_template_body:
+            raise ValueError("Exactly one of body or template_body must be provided.")
+        return self
 
     @classmethod
     def from_stub_response(cls, response: StubResponse) -> "StubResponsePayload":
@@ -128,6 +142,7 @@ class StubResponsePayload(BaseModel):
             status_code=response.status_code,
             headers=response.headers,
             body=response.body,
+            template_body=response.template_body,
         )
 
     def to_stub_response(self) -> StubResponse:
@@ -139,6 +154,52 @@ class StubResponsePayload(BaseModel):
             status_code=self.status_code,
             headers=self.headers,
             body=self.body,
+            template_body=self.template_body,
+        )
+
+
+class SseEventPayload(BaseModel):
+    data: str
+    event: str | None = None
+    id: str | None = None
+    retry: int | None = Field(default=None, ge=0)
+    delay_ms: int | None = Field(default=None, ge=0)
+
+    @classmethod
+    def from_sse_event(cls, event: SseEvent) -> "SseEventPayload":
+        return cls(
+            data=event.data,
+            event=event.event,
+            id=event.id,
+            retry=event.retry,
+            delay_ms=event.delay_ms,
+        )
+
+    def to_sse_event(self) -> SseEvent:
+        return SseEvent(
+            data=self.data,
+            event=self.event,
+            id=self.id,
+            retry=self.retry,
+            delay_ms=self.delay_ms,
+        )
+
+
+class SseStreamPayload(BaseModel):
+    events: list[SseEventPayload] = Field(min_length=1)
+    default_delay_ms: int = Field(default=0, ge=0)
+
+    @classmethod
+    def from_sse_stream(cls, stream: SseStream) -> "SseStreamPayload":
+        return cls(
+            events=[SseEventPayload.from_sse_event(event) for event in stream.events],
+            default_delay_ms=stream.default_delay_ms,
+        )
+
+    def to_sse_stream(self) -> SseStream:
+        return SseStream(
+            events=[event.to_sse_event() for event in self.events],
+            default_delay_ms=self.default_delay_ms,
         )
 
 
@@ -204,6 +265,15 @@ class StubActionPayload(BaseModel):
 
     response: StubResponsePayload | None = None
     proxy: StubProxyPayload | None = None
+    sse: SseStreamPayload | None = None
+
+    @model_validator(mode="after")
+    def _validate_action_xor(self):
+        configured_actions = [self.response, self.proxy, self.sse]
+        configured_count = sum(1 for action in configured_actions if action is not None)
+        if configured_count != 1:
+            raise ValueError("Exactly one of response, proxy, or sse must be provided.")
+        return self
 
     @classmethod
     def from_stub_action(cls, action: StubAction) -> "StubActionPayload":
@@ -217,6 +287,7 @@ class StubActionPayload(BaseModel):
             proxy=StubProxyPayload.from_stub_proxy(action.proxy)
             if action.proxy
             else None,
+            sse=SseStreamPayload.from_sse_stream(action.sse) if action.sse else None,
         )
 
     def to_stub_action(self) -> StubAction:
@@ -227,7 +298,53 @@ class StubActionPayload(BaseModel):
         return StubAction(
             response=self.response.to_stub_response() if self.response else None,
             proxy=self.proxy.to_stub_proxy() if self.proxy else None,
+            sse=self.sse.to_sse_stream() if self.sse else None,
         )
+
+
+class StubChaosPayload(BaseModel):
+    latency: "StubDelayPayload" = Field(default_factory=lambda: StubDelayPayload())
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_legacy_delay_fields(cls, data):
+        if not isinstance(data, dict):
+            return data
+        if "latency" in data:
+            return data
+        if "delay" in data:
+            data["latency"] = data.pop("delay")
+            return data
+        delay_ms = data.pop("delay_ms", None)
+        jitter_ms = data.pop("jitter_ms", None)
+        if delay_ms is not None or jitter_ms is not None:
+            data["latency"] = {
+                "base_ms": 0 if delay_ms is None else delay_ms,
+                "jitter_ms": 0 if jitter_ms is None else jitter_ms,
+            }
+        return data
+
+    @classmethod
+    def from_stub_chaos(cls, chaos: StubChaos) -> "StubChaosPayload":
+        return cls(latency=StubDelayPayload.from_stub_delay(chaos.latency))
+
+    def to_stub_chaos(self) -> StubChaos:
+        return StubChaos(latency=self.latency.to_stub_delay())
+
+
+class StubDelayPayload(BaseModel):
+    base_ms: int = Field(default=0, ge=0)
+    jitter_ms: int = Field(default=0, ge=0)
+
+    @classmethod
+    def from_stub_delay(cls, delay: StubDelay) -> "StubDelayPayload":
+        return cls(base_ms=delay.base_ms, jitter_ms=delay.jitter_ms)
+
+    def to_stub_delay(self) -> StubDelay:
+        return StubDelay(base_ms=self.base_ms, jitter_ms=self.jitter_ms)
+
+
+StubChaosPayload.model_rebuild()
 
 
 class StubPayload(BaseModel):
@@ -238,24 +355,21 @@ class StubPayload(BaseModel):
     request: StubRequestPayload
     action: StubActionPayload
     max_calls: int | None = None
+    chaos: StubChaosPayload | None = None
 
     def to_stub(self, scope: str | None = None) -> Stub:
         """
         Convert the request object to a stub.
         """
-
-        kwargs = {
-            "request": self.request.to_stub_request(),
-            "action": self.action.to_stub_action(),
-            "scope": scope,
-        }
-
-        if self.max_calls is not None:
-            kwargs["max_calls"] = self.max_calls
-
-        return Stub(
-            **kwargs,
+        stub = Stub(
+            request=self.request.to_stub_request(),
+            action=self.action.to_stub_action(),
+            scope=scope,
+            chaos=self.chaos.to_stub_chaos() if self.chaos else None,
         )
+        if self.max_calls is not None:
+            stub.max_calls = self.max_calls
+        return stub
 
 
 class StubViewPayload(BaseModel):
@@ -263,9 +377,11 @@ class StubViewPayload(BaseModel):
     A response object for stubbing.
     """
 
+    stub_id: str
     request: StubRequestPayload
     action: StubActionPayload
     scope: str | None = None
+    chaos: StubChaosPayload | None = None
 
 
 class StubListViewPayload(BaseModel):
@@ -283,9 +399,13 @@ class StubListViewPayload(BaseModel):
         return cls(
             stubs=[
                 StubViewPayload(
+                    stub_id=stub.stub_id,
                     request=StubRequestPayload.from_stub_request(stub.request),
                     action=StubActionPayload.from_stub_action(stub.action),
                     scope=stub.scope,
+                    chaos=StubChaosPayload.from_stub_chaos(stub.chaos)
+                    if stub.chaos
+                    else None,
                 )
                 for stub in stubs
             ]
@@ -304,6 +424,7 @@ class MockApiRequestViewPayload(BaseModel):
     body: str | bytes
     host: str
     scope: str | None = None
+    matched_stub_id: str | None = None
 
     @classmethod
     def from_mock_api_request(
@@ -320,6 +441,7 @@ class MockApiRequestViewPayload(BaseModel):
             body=request.body,
             host=request.host,
             scope=request.scope,
+            matched_stub_id=request.matched_stub_id,
         )
 
 

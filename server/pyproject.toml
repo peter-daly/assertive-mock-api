@@ -8,6 +8,7 @@ dependencies = [
     "clean-ioc>=1.15.0",
     "fastapi>=0.115.12",
     "httpx>=0.28.1",
+    "jinja2>=3.1.6",
     "pydantic>=2.11.3",
     "uvicorn>=0.34.1",
 ]

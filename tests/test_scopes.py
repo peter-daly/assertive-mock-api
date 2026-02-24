@@ -127,6 +127,7 @@ def test_scoped_list_endpoints_include_global(client: TestClient):
     assert len(stubs_unscoped.json()["stubs"]) == 1
     assert stubs_scoped.status_code == 200
     assert len(stubs_scoped.json()["stubs"]) == 2
+    assert "stub_id" in stubs_scoped.json()["stubs"][0]
     assert stubs_scoped.json()["stubs"][0]["scope"] == "team_a"
     assert stubs_scoped.json()["stubs"][1]["scope"] is None
 
@@ -160,3 +161,34 @@ def test_delete_scope_cascade_cleanup(client: TestClient):
     assert stubs.json()["stubs"] == []
     assert requests.status_code == 200
     assert requests.json()["requests"] == []
+
+
+def test_delete_stub_endpoint_deletes_by_stub_id(client: TestClient):
+    create_stub(client, path="/delete-me", body="x")
+    list_response = client.get("/__mock__/stubs")
+
+    assert list_response.status_code == 200
+    stub_id = list_response.json()["stubs"][0]["stub_id"]
+
+    delete_response = client.delete(f"/__mock__/stubs/{stub_id}")
+    after_response = client.get("/delete-me")
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["success"] is True
+    assert delete_response.json()["stub_id"] == stub_id
+    assert after_response.status_code == 404
+
+
+def test_delete_stub_endpoint_returns_404_when_missing(client: TestClient):
+    response = client.delete("/__mock__/stubs/missing-id")
+    assert response.status_code == 404
+
+
+def test_list_scopes_endpoint_returns_scopes(client: TestClient):
+    client.post("/__mock__/scopes", json={"name": "team_a"})
+    client.post("/__mock__/scopes", json={"name": "team_b"})
+
+    response = client.get("/__mock__/scopes")
+
+    assert response.status_code == 200
+    assert sorted(response.json()["scopes"]) == ["team_a", "team_b"]

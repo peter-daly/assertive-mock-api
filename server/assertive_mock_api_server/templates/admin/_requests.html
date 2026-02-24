@@ -1,0 +1,34 @@
+<h2>Requests (latest 100)</h2>
+
+{% if error %}
+<p style="color:#b00;"><strong>Error:</strong> {{ error }}</p>
+{% endif %}
+
+<table border="1" cellpadding="4" cellspacing="0" width="100%">
+  <thead>
+    <tr>
+      <th>Method</th>
+      <th>Path</th>
+      <th>Scope</th>
+      <th>Host</th>
+      <th>Matched Stub ID</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for req in requests %}
+    <tr>
+      <td><code>{{ req.method }}</code></td>
+      <td><code>{{ req.path }}</code></td>
+      <td>{{ req.scope or "-" }}</td>
+      <td>{{ req.host }}</td>
+      <td>
+        {% if req.matched_stub_id %}
+        <code><a href="/__admin__/stubs/{{ req.matched_stub_id }}">{{ req.matched_stub_id }}</a></code>
+        {% else %}
+        <code></code>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

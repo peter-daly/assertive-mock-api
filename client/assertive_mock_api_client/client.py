@@ -5,7 +5,7 @@ from typing import Any
 import httpx
 from assertive import Criteria, as_json_matches, is_gte
 from assertive.serialize import serialize
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class StubRequestPayload(BaseModel):
@@ -20,7 +20,30 @@ class StubRequestPayload(BaseModel):
 class StubResponsePayload(BaseModel):
     status_code: int
     headers: dict
-    body: Any
+    body: Any | None = None
+    template_body: str | None = None
+
+    @model_validator(mode="after")
+    def _validate_body_xor_template_body(self):
+        has_body = self.body is not None
+        has_template_body = self.template_body is not None
+
+        if has_body == has_template_body:
+            raise ValueError("Exactly one of body or template_body must be provided.")
+        return self
+
+
+class SseEventPayload(BaseModel):
+    data: str
+    event: str | None = None
+    id: str | None = None
+    retry: int | None = Field(default=None, ge=0)
+    delay_ms: int | None = Field(default=None, ge=0)
+
+
+class SseStreamPayload(BaseModel):
+    events: list[SseEventPayload] = Field(min_length=1)
+    default_delay_ms: int = Field(default=0, ge=0)
 
 
 class StubProxyPayload(BaseModel):
@@ -32,12 +55,31 @@ class StubProxyPayload(BaseModel):
 class StubActionPayload(BaseModel):
     response: StubResponsePayload | None = None
     proxy: StubProxyPayload | None = None
+    sse: SseStreamPayload | None = None
+
+    @model_validator(mode="after")
+    def _validate_action_xor(self):
+        configured_actions = [self.response, self.proxy, self.sse]
+        configured_count = sum(1 for action in configured_actions if action is not None)
+        if configured_count != 1:
+            raise ValueError("Exactly one of response, proxy, or sse must be provided.")
+        return self
+
+
+class StubDelayPayload(BaseModel):
+    base_ms: int = Field(default=0, ge=0)
+    jitter_ms: int = Field(default=0, ge=0)
+
+
+class StubChaosPayload(BaseModel):
+    latency: StubDelayPayload = Field(default_factory=lambda: StubDelayPayload())
 
 
 class StubPayload(BaseModel):
     request: StubRequestPayload
     action: StubActionPayload
     max_calls: int | None = None
+    chaos: StubChaosPayload | None = None
 
 
 class ApiAssertionPayload(BaseModel):
@@ -54,6 +96,29 @@ class _PreActionedStub:
     def __init__(self, mock_api: "MockApiClient", request: StubRequestPayload):
         self.mock_api = mock_api
         self.request = request
+        self._chaos: StubChaosPayload | None = None
+
+    def with_delay(
+        self,
+        *,
+        delay_ms: int,
+        jitter_ms: int = 0,
+    ) -> "_PreActionedStub":
+        self._chaos = StubChaosPayload(
+            latency=StubDelayPayload(base_ms=delay_ms, jitter_ms=jitter_ms)
+        )
+        return self
+
+    def _create_stub(
+        self, action: StubActionPayload, max_calls: int | None = None
+    ) -> None:
+        stub = StubPayload(
+            request=self.request,
+            action=action,
+            max_calls=max_calls,
+            chaos=self._chaos,
+        )
+        self.mock_api.create_stub(stub)
 
     def respond_with(
         self,
@@ -73,8 +138,27 @@ class _PreActionedStub:
         )
 
         action = StubActionPayload(response=response)
-        stub = StubPayload(request=self.request, action=action, max_calls=max_calls)
-        self.mock_api.create_stub(stub)
+        self._create_stub(action=action, max_calls=max_calls)
+
+    def respond_with_template(
+        self,
+        *,
+        status_code: int,
+        headers: dict,
+        template_body: str,
+        max_calls: int | None = None,
+    ) -> None:
+        """
+        Responds with a rendered template body.
+        """
+        response = StubResponsePayload(
+            status_code=status_code,
+            headers=headers,
+            template_body=template_body,
+        )
+
+        action = StubActionPayload(response=response)
+        self._create_stub(action=action, max_calls=max_calls)
 
     def respond_with_json(
         self,
@@ -104,8 +188,22 @@ class _PreActionedStub:
         """
         proxy = StubProxyPayload(url=url, headers=headers, timeout=timeout)
         action = StubActionPayload(proxy=proxy)
-        stub = StubPayload(request=self.request, action=action, max_calls=max_calls)
-        self.mock_api.create_stub(stub)
+        self._create_stub(action=action, max_calls=max_calls)
+
+    def respond_with_sse(
+        self,
+        *,
+        events: list[dict],
+        default_delay_ms: int = 0,
+        max_calls: int | None = None,
+    ) -> None:
+        payload_events = [SseEventPayload.model_validate(event) for event in events]
+        sse = SseStreamPayload(
+            events=payload_events,
+            default_delay_ms=default_delay_ms,
+        )
+        action = StubActionPayload(sse=sse)
+        self._create_stub(action=action, max_calls=max_calls)
 
 
 class MockApiClient:

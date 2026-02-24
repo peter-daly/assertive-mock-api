@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from assertive_mock_api_client.client import MockApiClient
 
@@ -97,6 +98,74 @@ def test_scoped_create_stub_sends_scope_header(monkeypatch):
     stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
     assert len(stub_calls) == 1
     assert stub_calls[0][3] == {"team_a": "1"}
+
+
+def test_scoped_create_template_stub_sends_template_body(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    def fake_delete(url, headers=None):
+        calls.append(("DELETE", url, None, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+    monkeypatch.setattr("httpx.delete", fake_delete)
+
+    client = MockApiClient()
+
+    with client.new_scope("team_a") as scoped:
+        scoped.when_requested_with(path="/hello").respond_with_template(
+            status_code=200,
+            headers={},
+            template_body="Hello {{ request.query.name }}",
+        )
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][3] == {"team_a": "1"}
+    assert stub_calls[0][2] is not None
+    response_payload = stub_calls[0][2]["action"]["response"]
+    assert "body" not in response_payload
+    assert response_payload["template_body"] == "Hello {{ request.query.name }}"
+
+
+def test_scoped_create_sse_stub_sends_sse_payload(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    def fake_delete(url, headers=None):
+        calls.append(("DELETE", url, None, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+    monkeypatch.setattr("httpx.delete", fake_delete)
+
+    client = MockApiClient()
+
+    with client.new_scope("team_a") as scoped:
+        scoped.when_requested_with(path="/events").respond_with_sse(
+            events=[
+                {"id": "1", "event": "message", "data": "first"},
+                {"id": "2", "event": "message", "data": "second"},
+            ],
+            default_delay_ms=25,
+        )
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][3] == {"team_a": "1"}
+    assert stub_calls[0][2] is not None
+    action_payload = stub_calls[0][2]["action"]
+    assert "response" not in action_payload
+    assert "proxy" not in action_payload
+    assert action_payload["sse"]["default_delay_ms"] == 25
+    assert len(action_payload["sse"]["events"]) == 2
 
 
 def test_scoped_confirm_request_sends_scope_header(monkeypatch):
@@ -225,3 +294,144 @@ def test_parallel_scopes_on_root_client_are_allowed(monkeypatch):
     assert len(delete_scope_calls) == 2
     assert stub_calls[0][3] == {"a": "1"}
     assert stub_calls[1][3] == {"b": "1"}
+
+
+def test_with_chaos_on_response_stub_serializes_top_level_chaos(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/slow").with_delay(
+        delay_ms=100,
+        jitter_ms=50,
+    ).respond_with(status_code=200, headers={}, body="ok")
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {"latency": {"base_ms": 100, "jitter_ms": 50}}
+
+
+def test_with_chaos_defaults_jitter_to_zero(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/slow").with_delay(delay_ms=25).respond_with(
+        status_code=200,
+        headers={},
+        body="ok",
+    )
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {"latency": {"base_ms": 25, "jitter_ms": 0}}
+
+
+def test_with_chaos_applies_to_proxy_action(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/proxy").with_delay(
+        delay_ms=10, jitter_ms=1
+    ).proxy_to(
+        url="https://example.com",
+    )
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {"latency": {"base_ms": 10, "jitter_ms": 1}}
+    assert "proxy" in stub_calls[0][2]["action"]
+
+
+def test_with_chaos_applies_to_sse_action(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/events").with_delay(
+        delay_ms=5,
+        jitter_ms=2,
+    ).respond_with_sse(events=[{"data": "first"}])
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {"latency": {"base_ms": 5, "jitter_ms": 2}}
+    assert "sse" in stub_calls[0][2]["action"]
+
+
+def test_with_chaos_last_call_wins(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/slow").with_delay(delay_ms=10).with_delay(
+        delay_ms=20,
+        jitter_ms=5,
+    ).respond_with(status_code=200, headers={}, body="ok")
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {"latency": {"base_ms": 20, "jitter_ms": 5}}
+
+
+def test_with_chaos_rejects_negative_values():
+    client = MockApiClient()
+
+    with pytest.raises(ValidationError):
+        client.when_requested_with(path="/slow").with_delay(delay_ms=-1)
+
+    with pytest.raises(ValidationError):
+        client.when_requested_with(path="/slow").with_delay(delay_ms=10, jitter_ms=-1)
+
+
+def test_without_with_chaos_payload_omits_chaos(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/fast").respond_with(
+        status_code=200,
+        headers={},
+        body="ok",
+    )
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert "chaos" not in stub_calls[0][2]

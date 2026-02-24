@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stub {{ stub.stub_id }} | Mock API Admin</title>
+  <style>
+    :root {
+      --bg: #f3f6f9;
+      --panel: #ffffff;
+      --text: #111827;
+      --muted: #4b5563;
+      --accent: #0369a1;
+      --border: #dbe3ec;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 1.5rem;
+      background: radial-gradient(circle at top right, #dbeafe 0%, var(--bg) 50%);
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+    }
+    .page { max-width: 960px; margin: 0 auto; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 1rem; }
+    .header a { color: var(--accent); text-decoration: none; font-weight: 700; }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+      background: var(--panel);
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+    }
+    .muted { color: var(--muted); }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <h1>Stub Detail</h1>
+      <a href="/__admin__">Back to Admin</a>
+    </div>
+
+    <div class="card">
+      <p><strong>Stub ID:</strong> <code>{{ stub.stub_id }}</code></p>
+      <p>
+        <strong>Scope:</strong>
+        {% if stub.scope %}
+          <a href="/__admin__/scopes/{{ stub.scope }}"><code>{{ stub.scope }}</code></a>
+        {% else %}
+          <span class="muted">Global</span>
+        {% endif %}
+      </p>
+      <h2>Request Matcher</h2>
+      <pre>{{ stub.request.model_dump() | tojson(indent=2) }}</pre>
+
+      <h2>Action</h2>
+      <pre>{{ stub.action.model_dump() | tojson(indent=2) }}</pre>
+
+      <h2>Chaos</h2>
+      {% if stub.chaos %}
+        <pre>{{ stub.chaos.model_dump() | tojson(indent=2) }}</pre>
+      {% else %}
+        <p class="muted">None</p>
+      {% endif %}
+    </div>
+  </div>
+</body>
+</html>

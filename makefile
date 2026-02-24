@@ -18,7 +18,7 @@ fixup:
 
 typecheck:
 	@echo "Typechecking"
-	@uv run --group dev pyright .
+	@uv run --group dev ty check .
 
 
 lint:

@@ -24,6 +24,30 @@ client.when_requested_with(path="/hello", method="GET").respond_with(
 assert client.confirm_request(path="/hello", method="GET") is True
 ```
 
+## Criteria Objects Auto-Serialize
+
+You can pass Assertive `Criteria` objects directly in client calls. The client
+automatically serializes them to API-safe JSON.
+
+```python
+from assertive_mock_api_client import MockApiClient
+from assertive import between
+
+client = MockApiClient("http://localhost:8910")
+
+assert client.confirm_request(path="/hello", times=between(1, 3)) is True
+```
+
+Equivalent serialized payload conceptually includes:
+
+```json
+{
+  "times": {"$between": {"lower": 1, "upper": 3, "is_inclusive": true}}
+}
+```
+
+`between(1, 3).exclusive()` serializes the same shape with `"is_inclusive": false`.
+
 ## Returning JSON
 
 Use `respond_with_json` to return a JSON body with the correct content type.
@@ -43,4 +67,29 @@ response = httpx.get("http://localhost:8910/orders/123")
 
 assert response.status_code == 200
 assert response.json()["status"] == "shipped"
+```
+
+## Mocking SSE
+
+Use `respond_with_sse` to create a streaming SSE stub.
+
+```python
+from assertive_mock_api_client import MockApiClient
+import httpx
+
+client = MockApiClient("http://localhost:8910")
+
+client.when_requested_with(path="/events", method="GET").respond_with_sse(
+    default_delay_ms=100,
+    events=[
+        {"id": "1", "event": "message", "data": "first"},
+        {"id": "2", "event": "message", "data": "second", "delay_ms": 250},
+    ],
+)
+
+with httpx.stream("GET", "http://localhost:8910/events") as response:
+    assert response.status_code == 200
+    for line in response.iter_lines():
+        if line:
+            print(line)
 ```

@@ -6,10 +6,10 @@ dev = [
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.6.15",
     "pymdown-extensions>=10.16",
-    "pyright>=1.1.403",
     "pytest>=8.4.1",
     "ruff>=0.12.5",
+    "ty>=0.0.18",
 ]
 
-[tool.pyright]
-extraPaths = ["server", "client"]
+[tool.ty.environment]
+root = ["./server", "./client", "."]
