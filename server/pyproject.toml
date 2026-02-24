@@ -1,6 +1,6 @@
 [project]
 name = "assertive-mock-api-server"
-version = "1.0.1"
+version = "1.1.0"
 description = "Assertive mock API server"
 requires-python = ">=3.10"
 dependencies = [
