@@ -10,6 +10,7 @@ nav:
       - Overview: server/overview.md
       - Docker Compose Deploy: server/docker-compose.md
       - API Usage: server/usage.md
+      - Admin Pages: server/admin-pages.md
       - Matching Scenarios: server/matching-scenarios.md
   - Client:
       - Overview: client/overview.md
