@@ -1,4 +1,5 @@
 import json
+import warnings
 from contextlib import contextmanager
 from typing import Any
 
@@ -71,8 +72,17 @@ class StubDelayPayload(BaseModel):
     jitter_ms: int = Field(default=0, ge=0)
 
 
+class StubConnectionDropPayload(BaseModel):
+    probability: float = Field(ge=0, le=1)
+
+
+class StubFaultsPayload(BaseModel):
+    connection_drop: StubConnectionDropPayload | None = None
+
+
 class StubChaosPayload(BaseModel):
     latency: StubDelayPayload = Field(default_factory=lambda: StubDelayPayload())
+    faults: StubFaultsPayload = Field(default_factory=lambda: StubFaultsPayload())
 
 
 class StubPayload(BaseModel):
@@ -98,14 +108,42 @@ class _PreActionedStub:
         self.request = request
         self._chaos: StubChaosPayload | None = None
 
+    def _ensure_chaos(self) -> StubChaosPayload:
+        if self._chaos is None:
+            self._chaos = StubChaosPayload()
+        return self._chaos
+
+    def with_latency(
+        self,
+        *,
+        delay_ms: int,
+        jitter_ms: int = 0,
+    ) -> "_PreActionedStub":
+        chaos = self._ensure_chaos()
+        chaos.latency = StubDelayPayload(base_ms=delay_ms, jitter_ms=jitter_ms)
+        return self
+
     def with_delay(
         self,
         *,
         delay_ms: int,
         jitter_ms: int = 0,
     ) -> "_PreActionedStub":
-        self._chaos = StubChaosPayload(
-            latency=StubDelayPayload(base_ms=delay_ms, jitter_ms=jitter_ms)
+        warnings.warn(
+            "with_delay(...) is deprecated; use with_latency(...) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.with_latency(delay_ms=delay_ms, jitter_ms=jitter_ms)
+
+    def with_connection_drop(
+        self,
+        *,
+        probability: float,
+    ) -> "_PreActionedStub":
+        chaos = self._ensure_chaos()
+        chaos.faults = StubFaultsPayload(
+            connection_drop=StubConnectionDropPayload(probability=probability)
         )
         return self
 

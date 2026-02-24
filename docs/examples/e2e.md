@@ -126,3 +126,65 @@ assert response.status_code == 200
 ```
 
 With this config, each matched call incurs delay sampled from `100..150 ms`.
+
+## Chaos Connection Drop Example
+
+```python
+import httpx
+
+httpx.post(
+    "http://localhost:8910/__mock__/stubs",
+    json={
+        "request": {"path": "/unstable", "method": "GET"},
+        "action": {
+            "response": {
+                "status_code": 200,
+                "headers": {"Content-Type": "text/plain"},
+                "body": "possibly dropped",
+            }
+        },
+        "chaos": {
+            "faults": {
+                "connection_drop": {
+                    "probability": 1.0,
+                }
+            }
+        },
+    },
+).raise_for_status()
+
+with httpx.Client() as client:
+    try:
+        client.get("http://localhost:8910/unstable")
+        raise AssertionError("Expected a transport/protocol error")
+    except httpx.HTTPError:
+        pass
+```
+
+With this config, each matched call is interrupted mid-response.
+
+## Chaos Connection Drop (Client Fluent) Example
+
+```python
+from assertive_mock_api_client import MockApiClient
+import httpx
+
+client = MockApiClient("http://localhost:8910")
+
+client.when_requested_with(path="/unstable-client", method="GET").with_connection_drop(
+    probability=1.0
+).respond_with(
+    status_code=200,
+    headers={"Content-Type": "text/plain"},
+    body="possibly dropped",
+)
+
+with httpx.Client() as http_client:
+    try:
+        http_client.get("http://localhost:8910/unstable-client")
+        raise AssertionError("Expected a transport/protocol error")
+    except httpx.HTTPError:
+        pass
+```
+
+This produces `chaos.faults.connection_drop` in the stub payload.

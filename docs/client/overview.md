@@ -93,3 +93,33 @@ with httpx.stream("GET", "http://localhost:8910/events") as response:
         if line:
             print(line)
 ```
+
+## Chaos Connection Drop
+
+Use `with_connection_drop(probability=...)` to inject connection-drop faults.
+
+```python
+from assertive_mock_api_client import MockApiClient
+import httpx
+
+client = MockApiClient("http://localhost:8910")
+
+client.when_requested_with(path="/unstable", method="GET").with_connection_drop(
+    probability=1.0
+).respond_with(
+    status_code=200,
+    headers={"Content-Type": "text/plain"},
+    body="possibly dropped",
+)
+
+with httpx.Client() as http_client:
+    try:
+        http_client.get("http://localhost:8910/unstable")
+        raise AssertionError("Expected a transport/protocol error")
+    except httpx.HTTPError:
+        pass
+```
+
+`with_latency(...)` and `with_connection_drop(...)` can be chained together; the
+client emits both `chaos.latency` and `chaos.faults.connection_drop`.
+`with_delay(...)` remains as a backward-compatible deprecated alias.

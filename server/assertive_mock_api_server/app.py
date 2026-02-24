@@ -2,7 +2,7 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from clean_ioc.ext.fastapi import Resolve, add_container_to_app
 from fastapi import FastAPI, HTTPException, Request
@@ -12,6 +12,8 @@ from fastapi.templating import Jinja2Templates
 from assertive_mock_api_server.container import get_container
 from assertive_mock_api_server.core import (
     SseEvent,
+    MockApiDropConnectionResponse,
+    MockApiResponse,
     MockApiSseResponse,
     MockApiRequest,
     MockApiServer,
@@ -76,7 +78,7 @@ async def _load_init_stubs(container) -> None:
             payload = StubPayload.model_validate(payload_data)
         except Exception as error:
             raise RuntimeError(
-                f"Invalid stub payload in {INIT_STUBS_FILE} at entry {index}"
+                f"Invalid stub payload in {INIT_STUBS_FILE} at entry {index}: {error}"
             ) from error
 
         stub = payload.to_stub(scope=None)
@@ -109,6 +111,7 @@ app = FastAPI(
 )
 templates = Jinja2Templates(directory=str(Path(__file__).with_name("templates")))
 POLL_INTERVAL = "3s"
+CONNECTION_DROP_ERROR = "Injected connection drop fault"
 
 
 async def extract_body(request: Request) -> str | bytes:
@@ -133,6 +136,196 @@ async def extract_body(request: Request) -> str | bytes:
     except UnicodeDecodeError:
         # Return raw bytes if can't be decoded
         return body_bytes
+
+
+def _remove_content_length(headers: dict) -> dict:
+    return {
+        key: value
+        for key, value in headers.items()
+        if str(key).lower() != "content-length"
+    }
+
+
+def _to_body_bytes(content: Any) -> bytes:
+    if content is None:
+        return b""
+    if isinstance(content, bytes):
+        return content
+    if isinstance(content, str):
+        return content.encode("utf-8")
+    if isinstance(content, (dict, list)):
+        return json.dumps(content).encode("utf-8")
+    return str(content).encode("utf-8")
+
+
+def _to_partial_chunk(content: bytes) -> bytes:
+    if not content:
+        return b""
+    return content[: max(1, len(content) // 2)]
+
+
+def _contains_content_type(headers: dict) -> bool:
+    return any(str(key).lower() == "content-type" for key in headers)
+
+
+async def _build_api_request(
+    request: Request, scope_repository: ScopeRepository
+) -> MockApiRequest:
+    headers = dict(request.headers)
+    scope = resolve_scope_from_headers(headers, scope_repository)
+    return MockApiRequest(
+        method=request.method,
+        path=request.url.path,
+        query=dict(request.query_params),
+        headers=headers,
+        body=await extract_body(request),
+        host=request.url.hostname or "",
+        scope=scope,
+    )
+
+
+def _template_render_error_response(error: TemplateRenderError) -> JSONResponse:
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": "TEMPLATE_RENDER_ERROR",
+            "detail": str(error),
+        },
+    )
+
+
+def _build_sse_response(api_response: MockApiSseResponse) -> StreamingResponse:
+    async def stream_events():
+        event: SseEvent
+        for index, event in enumerate(api_response.events):
+            delay_ms = resolve_sse_delay_ms(event, api_response.default_delay_ms)
+            if delay_ms > 0:
+                await asyncio.sleep(delay_ms / 1000)
+            encoded_event = encode_sse_event(event).encode("utf-8")
+            yield encoded_event
+
+    return StreamingResponse(
+        stream_events(),
+        status_code=200,
+        headers={
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+        media_type="text/event-stream",
+    )
+
+
+def _build_connection_drop_response(
+    content: Any, status_code: int, headers: dict
+) -> StreamingResponse:
+    response_headers = _remove_content_length(headers)
+    media_type = None
+    if isinstance(content, (dict, list)) and not _contains_content_type(
+        response_headers
+    ):
+        media_type = "application/json"
+    if isinstance(content, bytes) and not _contains_content_type(response_headers):
+        media_type = "application/octet-stream"
+    content_bytes = _to_body_bytes(content)
+
+    async def drop_stream():
+        partial_chunk = _to_partial_chunk(content_bytes)
+        if partial_chunk:
+            yield partial_chunk
+        raise RuntimeError(CONNECTION_DROP_ERROR)
+
+    return StreamingResponse(
+        drop_stream(),
+        status_code=status_code,
+        headers=response_headers,
+        media_type=media_type,
+    )
+
+
+def _build_standard_response(api_response: MockApiResponse) -> Response:
+    content = api_response.body
+    status_code = api_response.status_code
+    headers = api_response.headers
+
+    if isinstance(content, (dict, list)):
+        return JSONResponse(
+            content=content,
+            status_code=status_code,
+            headers=headers,
+        )
+    if isinstance(content, str):
+        return Response(
+            content=content,
+            status_code=status_code,
+            headers=headers,
+        )
+    if isinstance(content, bytes):
+        return Response(
+            content=content,
+            status_code=status_code,
+            headers=headers,
+            media_type="application/octet-stream",
+        )
+
+    return Response(status_code=status_code, headers=headers)
+
+
+def _build_drop_connection_sse_response(
+    api_response: MockApiDropConnectionResponse,
+) -> StreamingResponse:
+    if api_response.events is None:
+        raise ValueError("Drop connection SSE response requires events")
+    events = api_response.events
+
+    async def stream_events():
+        event: SseEvent
+        for index, event in enumerate(events):
+            delay_ms = resolve_sse_delay_ms(event, api_response.default_delay_ms)
+            if delay_ms > 0:
+                await asyncio.sleep(delay_ms / 1000)
+            encoded_event = encode_sse_event(event).encode("utf-8")
+            if index == 0:
+                partial_chunk = _to_partial_chunk(encoded_event)
+                if partial_chunk:
+                    yield partial_chunk
+                raise RuntimeError(CONNECTION_DROP_ERROR)
+            yield encoded_event
+
+    return StreamingResponse(
+        stream_events(),
+        status_code=api_response.status_code,
+        headers=api_response.headers,
+        media_type="text/event-stream",
+    )
+
+
+def _build_drop_connection_response(
+    api_response: MockApiDropConnectionResponse,
+) -> Response:
+    if api_response.events is not None:
+        return _build_drop_connection_sse_response(api_response)
+    return _build_connection_drop_response(
+        api_response.body,
+        api_response.status_code,
+        api_response.headers,
+    )
+
+
+_RESPONSE_BUILDERS_BY_TYPE: dict[type[Any], Callable[[Any], Response]] = {
+    MockApiDropConnectionResponse: _build_drop_connection_response,
+    MockApiSseResponse: _build_sse_response,
+    MockApiResponse: _build_standard_response,
+}
+
+
+def _to_fastapi_response(
+    api_response: MockApiSseResponse | MockApiResponse | MockApiDropConnectionResponse,
+) -> Response:
+    response_builder = _RESPONSE_BUILDERS_BY_TYPE.get(type(api_response))
+    if response_builder is None:
+        raise TypeError(f"Unsupported response type: {type(api_response).__name__}")
+    return response_builder(api_response)
 
 
 def resolve_scope_from_headers(
@@ -515,79 +708,11 @@ async def catch_all(
     """
     Catch-all endpoint for all requests.
     """
-    headers = dict(request.headers)
-    scope = resolve_scope_from_headers(headers, scope_repository)
-    query = dict(request.query_params)
-    method = request.method
-    body = await extract_body(request)
-    hostname = request.url.hostname or ""
-    path = request.url.path
-
-    api_request = MockApiRequest(
-        method=method,
-        path=path,
-        query=query,
-        headers=headers,
-        body=body,
-        host=hostname,
-        scope=scope,
-    )
+    api_request = await _build_api_request(request, scope_repository)
 
     try:
         api_response = await mock_server.handle_request(api_request)
     except TemplateRenderError as error:
-        return JSONResponse(
-            status_code=500,
-            content={
-                "error": "TEMPLATE_RENDER_ERROR",
-                "detail": str(error),
-            },
-        )
+        return _template_render_error_response(error)
 
-    if isinstance(api_response, MockApiSseResponse):
-
-        async def stream_events():
-            event: SseEvent
-            for event in api_response.events:
-                delay_ms = resolve_sse_delay_ms(event, api_response.default_delay_ms)
-                if delay_ms > 0:
-                    await asyncio.sleep(delay_ms / 1000)
-                yield encode_sse_event(event).encode("utf-8")
-
-        return StreamingResponse(
-            stream_events(),
-            status_code=200,
-            headers={
-                "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-            },
-            media_type="text/event-stream",
-        )
-
-    # Convert MockApiResponse to FastAPI response
-    content = api_response.body
-    status_code = api_response.status_code
-    response_headers = api_response.headers
-
-    # Choose response type based on content
-    if isinstance(content, dict) or isinstance(content, list):
-        return JSONResponse(
-            content=content,
-            status_code=status_code,
-            headers=response_headers,
-        )
-    if isinstance(content, str):
-        return Response(
-            content=content, status_code=status_code, headers=response_headers
-        )
-    if isinstance(content, bytes):
-        return Response(
-            content=content,
-            status_code=status_code,
-            headers=response_headers,
-            media_type="application/octet-stream",
-        )
-
-    # For None or other types
-    return Response(status_code=status_code, headers=response_headers)
+    return _to_fastapi_response(api_response)

@@ -306,7 +306,7 @@ def test_with_chaos_on_response_stub_serializes_top_level_chaos(monkeypatch):
     monkeypatch.setattr("httpx.post", fake_post)
 
     client = MockApiClient()
-    client.when_requested_with(path="/slow").with_delay(
+    client.when_requested_with(path="/slow").with_latency(
         delay_ms=100,
         jitter_ms=50,
     ).respond_with(status_code=200, headers={}, body="ok")
@@ -327,7 +327,7 @@ def test_with_chaos_defaults_jitter_to_zero(monkeypatch):
     monkeypatch.setattr("httpx.post", fake_post)
 
     client = MockApiClient()
-    client.when_requested_with(path="/slow").with_delay(delay_ms=25).respond_with(
+    client.when_requested_with(path="/slow").with_latency(delay_ms=25).respond_with(
         status_code=200,
         headers={},
         body="ok",
@@ -349,7 +349,7 @@ def test_with_chaos_applies_to_proxy_action(monkeypatch):
     monkeypatch.setattr("httpx.post", fake_post)
 
     client = MockApiClient()
-    client.when_requested_with(path="/proxy").with_delay(
+    client.when_requested_with(path="/proxy").with_latency(
         delay_ms=10, jitter_ms=1
     ).proxy_to(
         url="https://example.com",
@@ -372,7 +372,7 @@ def test_with_chaos_applies_to_sse_action(monkeypatch):
     monkeypatch.setattr("httpx.post", fake_post)
 
     client = MockApiClient()
-    client.when_requested_with(path="/events").with_delay(
+    client.when_requested_with(path="/events").with_latency(
         delay_ms=5,
         jitter_ms=2,
     ).respond_with_sse(events=[{"data": "first"}])
@@ -394,7 +394,7 @@ def test_with_chaos_last_call_wins(monkeypatch):
     monkeypatch.setattr("httpx.post", fake_post)
 
     client = MockApiClient()
-    client.when_requested_with(path="/slow").with_delay(delay_ms=10).with_delay(
+    client.when_requested_with(path="/slow").with_latency(delay_ms=10).with_latency(
         delay_ms=20,
         jitter_ms=5,
     ).respond_with(status_code=200, headers={}, body="ok")
@@ -409,10 +409,238 @@ def test_with_chaos_rejects_negative_values():
     client = MockApiClient()
 
     with pytest.raises(ValidationError):
-        client.when_requested_with(path="/slow").with_delay(delay_ms=-1)
+        client.when_requested_with(path="/slow").with_latency(delay_ms=-1)
 
     with pytest.raises(ValidationError):
-        client.when_requested_with(path="/slow").with_delay(delay_ms=10, jitter_ms=-1)
+        client.when_requested_with(path="/slow").with_latency(delay_ms=10, jitter_ms=-1)
+
+
+def test_with_delay_alias_remains_supported(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    with pytest.warns(DeprecationWarning, match="with_delay"):
+        client.when_requested_with(path="/slow").with_delay(
+            delay_ms=15,
+            jitter_ms=4,
+        ).respond_with(status_code=200, headers={}, body="ok")
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {"latency": {"base_ms": 15, "jitter_ms": 4}}
+
+
+def test_with_connection_drop_on_response_stub_serializes_nested_faults(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/unstable").with_connection_drop(
+        probability=0.75
+    ).respond_with(status_code=200, headers={}, body="ok")
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {
+        "faults": {"connection_drop": {"probability": 0.75}}
+    }
+
+
+def test_with_connection_drop_applies_to_proxy_action(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/proxy").with_connection_drop(
+        probability=0.2
+    ).proxy_to(url="https://example.com")
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {
+        "faults": {"connection_drop": {"probability": 0.2}}
+    }
+    assert "proxy" in stub_calls[0][2]["action"]
+
+
+def test_with_connection_drop_applies_to_sse_action(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/events").with_connection_drop(
+        probability=1.0
+    ).respond_with_sse(events=[{"data": "first"}])
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {
+        "faults": {"connection_drop": {"probability": 1.0}}
+    }
+    assert "sse" in stub_calls[0][2]["action"]
+
+
+def test_with_connection_drop_last_call_wins(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/unstable").with_connection_drop(
+        probability=0.1
+    ).with_connection_drop(probability=0.9).respond_with(
+        status_code=200, headers={}, body="ok"
+    )
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {
+        "faults": {"connection_drop": {"probability": 0.9}}
+    }
+
+
+def test_with_connection_drop_rejects_out_of_range_probability():
+    client = MockApiClient()
+
+    with pytest.raises(ValidationError):
+        client.when_requested_with(path="/unstable").with_connection_drop(
+            probability=-0.1
+        )
+
+    with pytest.raises(ValidationError):
+        client.when_requested_with(path="/unstable").with_connection_drop(
+            probability=1.1
+        )
+
+
+def test_with_latency_then_connection_drop_merges_chaos(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/unstable").with_latency(
+        delay_ms=20, jitter_ms=5
+    ).with_connection_drop(probability=0.4).respond_with(
+        status_code=200, headers={}, body="ok"
+    )
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {
+        "latency": {"base_ms": 20, "jitter_ms": 5},
+        "faults": {"connection_drop": {"probability": 0.4}},
+    }
+
+
+def test_with_connection_drop_then_delay_merges_chaos(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/unstable").with_connection_drop(
+        probability=0.6
+    ).with_latency(delay_ms=30, jitter_ms=0).respond_with(
+        status_code=200, headers={}, body="ok"
+    )
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {
+        "latency": {"base_ms": 30, "jitter_ms": 0},
+        "faults": {"connection_drop": {"probability": 0.6}},
+    }
+
+
+def test_repeated_with_latency_preserves_connection_drop(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/unstable").with_connection_drop(
+        probability=0.3
+    ).with_latency(delay_ms=10).with_latency(delay_ms=40, jitter_ms=7).respond_with(
+        status_code=200, headers={}, body="ok"
+    )
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {
+        "latency": {"base_ms": 40, "jitter_ms": 7},
+        "faults": {"connection_drop": {"probability": 0.3}},
+    }
+
+
+def test_repeated_with_connection_drop_preserves_latency(monkeypatch):
+    calls: list[tuple[str, str, dict | None, dict | None]] = []
+
+    def fake_post(url, json=None, headers=None):
+        calls.append(("POST", url, json, headers))
+        return _FakeResponse(json_payload={"success": True})
+
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    client = MockApiClient()
+    client.when_requested_with(path="/unstable").with_latency(
+        delay_ms=50, jitter_ms=9
+    ).with_connection_drop(probability=0.1).with_connection_drop(
+        probability=0.8
+    ).respond_with(status_code=200, headers={}, body="ok")
+
+    stub_calls = [call for call in calls if call[1].endswith("/__mock__/stubs")]
+    assert len(stub_calls) == 1
+    assert stub_calls[0][2] is not None
+    assert stub_calls[0][2]["chaos"] == {
+        "latency": {"base_ms": 50, "jitter_ms": 9},
+        "faults": {"connection_drop": {"probability": 0.8}},
+    }
 
 
 def test_without_with_chaos_payload_omits_chaos(monkeypatch):

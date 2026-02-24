@@ -180,3 +180,73 @@ def test_preloaded_stubs_reject_invalid_chaos(monkeypatch, tmp_path: Path):
     with pytest.raises(RuntimeError, match="Invalid stub payload"):
         with TestClient(app_module.app):
             pass
+
+
+def test_preloaded_stubs_support_nested_connection_drop_fault(
+    monkeypatch, tmp_path: Path
+):
+    init_file = tmp_path / "stubs.json"
+    _write_init_stubs(
+        init_file,
+        {
+            "stubs": [
+                {
+                    "id": "chaos-drop-preload",
+                    "request": {"path": "/chaos-drop-preload", "method": "GET"},
+                    "action": {
+                        "response": {
+                            "status_code": 200,
+                            "headers": {},
+                            "body": "maybe-drop",
+                        }
+                    },
+                    "chaos": {
+                        "faults": {"connection_drop": {"probability": 0.0}},
+                    },
+                }
+            ]
+        },
+    )
+
+    monkeypatch.setattr(app_module, "INIT_STUBS_FILE", init_file)
+
+    with TestClient(app_module.app) as client:
+        stubs_response = client.get("/__mock__/stubs")
+        assert stubs_response.status_code == 200
+        stubs = stubs_response.json()["stubs"]
+        assert len(stubs) == 1
+        assert stubs[0]["chaos"]["faults"]["connection_drop"]["probability"] == 0.0
+
+
+def test_preloaded_stubs_rejects_top_level_connection_drop_fault(
+    monkeypatch, tmp_path: Path
+):
+    init_file = tmp_path / "stubs.json"
+    _write_init_stubs(
+        init_file,
+        {
+            "stubs": [
+                {
+                    "id": "chaos-drop-invalid-shape",
+                    "request": {
+                        "path": "/chaos-drop-invalid-shape",
+                        "method": "GET",
+                    },
+                    "action": {
+                        "response": {
+                            "status_code": 200,
+                            "headers": {},
+                            "body": "x",
+                        }
+                    },
+                    "chaos": {"connection_drop": {"probability": 1.0}},
+                }
+            ]
+        },
+    )
+
+    monkeypatch.setattr(app_module, "INIT_STUBS_FILE", init_file)
+
+    with pytest.raises(RuntimeError, match="chaos.faults.connection_drop"):
+        with TestClient(app_module.app):
+            pass

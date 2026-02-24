@@ -212,8 +212,23 @@ class StubDelay:
 
 
 @dataclass(kw_only=True)
+class StubConnectionDrop:
+    probability: float = 1.0
+
+    def __post_init__(self) -> None:
+        if self.probability < 0 or self.probability > 1:
+            raise ValueError("probability must be between 0 and 1")
+
+
+@dataclass(kw_only=True)
+class StubFaults:
+    connection_drop: StubConnectionDrop | None = None
+
+
+@dataclass(kw_only=True)
 class StubChaos:
     latency: StubDelay = field(default_factory=StubDelay)
+    faults: StubFaults = field(default_factory=StubFaults)
 
 
 @dataclass(kw_only=True)
@@ -436,6 +451,21 @@ class MockApiSseResponse:
     default_delay_ms: int = 0
 
 
+@dataclass(kw_only=True)
+class MockApiDropConnectionResponse:
+    status_code: int
+    headers: dict
+    body: Any | None = None
+    events: list[SseEvent] | None = None
+    default_delay_ms: int = 0
+
+    def __post_init__(self) -> None:
+        if self.body is not None and self.events is not None:
+            raise ValueError("Only one of body or events can be set on drop response")
+        if self.events is not None and not self.events:
+            raise ValueError("events must not be empty when provided")
+
+
 def resolve_stub_delay_ms(stub: Stub) -> int:
     if stub.chaos is None:
         return 0
@@ -445,6 +475,14 @@ def resolve_stub_delay_ms(stub: Stub) -> int:
         stub.chaos.latency.base_ms,
         stub.chaos.latency.base_ms + stub.chaos.latency.jitter_ms,
     )
+
+
+def should_drop_connection(stub: Stub) -> bool:
+    if stub.chaos is None:
+        return False
+    if stub.chaos.faults.connection_drop is None:
+        return False
+    return random.random() < stub.chaos.faults.connection_drop.probability
 
 
 def resolve_sse_delay_ms(event: SseEvent, default_delay_ms: int) -> int:
@@ -570,7 +608,7 @@ class MockApiServer:
 
     async def handle_request(
         self, request: MockApiRequest
-    ) -> MockApiResponse | MockApiSseResponse:
+    ) -> MockApiResponse | MockApiSseResponse | MockApiDropConnectionResponse:
         """
         Handles the given request and returns a response.
         """
@@ -589,6 +627,23 @@ class MockApiServer:
             await asyncio.sleep(delay_ms / 1000)
 
         response = await self.response_generator.generate(best_match.stub, request)
+        if should_drop_connection(best_match.stub):
+            if isinstance(response, MockApiSseResponse):
+                return MockApiDropConnectionResponse(
+                    status_code=200,
+                    headers={
+                        "Content-Type": "text/event-stream",
+                        "Cache-Control": "no-cache",
+                        "Connection": "keep-alive",
+                    },
+                    events=response.events,
+                    default_delay_ms=response.default_delay_ms,
+                )
+            return MockApiDropConnectionResponse(
+                status_code=response.status_code,
+                headers=response.headers,
+                body=response.body,
+            )
         return response
 
     async def add_stub(self, stub: Stub) -> None:

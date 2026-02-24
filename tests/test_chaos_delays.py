@@ -186,3 +186,89 @@ def test_chaos_payload_accepts_legacy_jitter_field_without_explicit_delay(
     )
 
     assert response.status_code == 200
+
+
+def test_chaos_payload_accepts_nested_connection_drop(client: TestClient):
+    response = client.post(
+        "/__mock__/stubs",
+        json={
+            "request": {"path": "/chaos-drop-nested", "method": "GET"},
+            "action": {
+                "response": {
+                    "status_code": 200,
+                    "headers": {},
+                    "body": "ok",
+                }
+            },
+            "chaos": {
+                "faults": {
+                    "connection_drop": {"probability": 0.5},
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_chaos_payload_rejects_invalid_connection_drop_probability(client: TestClient):
+    response = client.post(
+        "/__mock__/stubs",
+        json={
+            "request": {"path": "/chaos-drop-invalid", "method": "GET"},
+            "action": {
+                "response": {
+                    "status_code": 200,
+                    "headers": {},
+                    "body": "ok",
+                }
+            },
+            "chaos": {
+                "faults": {
+                    "connection_drop": {"probability": 1.5},
+                }
+            },
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_chaos_payload_rejects_top_level_connection_drop_key(client: TestClient):
+    response = client.post(
+        "/__mock__/stubs",
+        json={
+            "request": {"path": "/chaos-drop-top-level", "method": "GET"},
+            "action": {
+                "response": {
+                    "status_code": 200,
+                    "headers": {},
+                    "body": "ok",
+                }
+            },
+            "chaos": {"connection_drop": {"probability": 1.0}},
+        },
+    )
+
+    assert response.status_code == 422
+    assert "chaos.faults.connection_drop" in response.text
+
+
+def test_should_drop_connection_uses_probability_threshold(monkeypatch):
+    stub = core_module.Stub(
+        request=core_module.StubRequest(path="/drop-threshold"),
+        action=core_module.StubAction(
+            response=core_module.StubResponse(status_code=200, headers={}, body="ok")
+        ),
+        chaos=core_module.StubChaos(
+            faults=core_module.StubFaults(
+                connection_drop=core_module.StubConnectionDrop(probability=0.5)
+            )
+        ),
+    )
+
+    monkeypatch.setattr(core_module.random, "random", lambda: 0.49)
+    assert core_module.should_drop_connection(stub) is True
+
+    monkeypatch.setattr(core_module.random, "random", lambda: 0.5)
+    assert core_module.should_drop_connection(stub) is False

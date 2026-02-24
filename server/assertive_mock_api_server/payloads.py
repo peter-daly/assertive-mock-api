@@ -8,7 +8,9 @@ from .core import (
     Stub,
     StubAction,
     StubChaos,
+    StubConnectionDrop,
     StubDelay,
+    StubFaults,
     StubRequest,
     StubProxy,
     StubResponse,
@@ -306,12 +308,17 @@ class StubActionPayload(BaseModel):
 
 class StubChaosPayload(BaseModel):
     latency: "StubDelayPayload" = Field(default_factory=lambda: StubDelayPayload())
+    faults: "StubFaultsPayload" = Field(default_factory=lambda: StubFaultsPayload())
 
     @model_validator(mode="before")
     @classmethod
     def _migrate_legacy_delay_fields(cls, data):
         if not isinstance(data, dict):
             return data
+        if "connection_drop" in data:
+            raise ValueError(
+                "Use chaos.faults.connection_drop instead of chaos.connection_drop"
+            )
         if "latency" in data:
             return data
         if "delay" in data:
@@ -328,10 +335,16 @@ class StubChaosPayload(BaseModel):
 
     @classmethod
     def from_stub_chaos(cls, chaos: StubChaos) -> "StubChaosPayload":
-        return cls(latency=StubDelayPayload.from_stub_delay(chaos.latency))
+        return cls(
+            latency=StubDelayPayload.from_stub_delay(chaos.latency),
+            faults=StubFaultsPayload.from_stub_faults(chaos.faults),
+        )
 
     def to_stub_chaos(self) -> StubChaos:
-        return StubChaos(latency=self.latency.to_stub_delay())
+        return StubChaos(
+            latency=self.latency.to_stub_delay(),
+            faults=self.faults.to_stub_faults(),
+        )
 
 
 class StubDelayPayload(BaseModel):
@@ -344,6 +357,40 @@ class StubDelayPayload(BaseModel):
 
     def to_stub_delay(self) -> StubDelay:
         return StubDelay(base_ms=self.base_ms, jitter_ms=self.jitter_ms)
+
+
+class StubConnectionDropPayload(BaseModel):
+    probability: float = Field(default=1.0, ge=0, le=1)
+
+    @classmethod
+    def from_stub_connection_drop(
+        cls, connection_drop: StubConnectionDrop
+    ) -> "StubConnectionDropPayload":
+        return cls(probability=connection_drop.probability)
+
+    def to_stub_connection_drop(self) -> StubConnectionDrop:
+        return StubConnectionDrop(probability=self.probability)
+
+
+class StubFaultsPayload(BaseModel):
+    connection_drop: StubConnectionDropPayload | None = None
+
+    @classmethod
+    def from_stub_faults(cls, faults: StubFaults) -> "StubFaultsPayload":
+        connection_drop = (
+            StubConnectionDropPayload.from_stub_connection_drop(faults.connection_drop)
+            if faults.connection_drop is not None
+            else None
+        )
+        return cls(connection_drop=connection_drop)
+
+    def to_stub_faults(self) -> StubFaults:
+        connection_drop = (
+            self.connection_drop.to_stub_connection_drop()
+            if self.connection_drop is not None
+            else None
+        )
+        return StubFaults(connection_drop=connection_drop)
 
 
 StubChaosPayload.model_rebuild()

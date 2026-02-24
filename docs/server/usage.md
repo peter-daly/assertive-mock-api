@@ -100,6 +100,40 @@ Semantics:
 - Chaos applies across `response`, `proxy`, and `sse` action types.
 - For SSE stubs, chaos delay is applied once before stream start; per-event SSE delays still use existing SSE fields.
 
+## Chaos Faults: Connection Drop
+
+You can configure app-level connection drops under `chaos.faults.connection_drop`.
+
+```bash
+curl -X POST http://localhost:8910/__mock__/stubs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request": {"path": "/chaos-drop", "method": "GET"},
+    "action": {
+      "response": {
+        "status_code": 200,
+        "headers": {"Content-Type": "text/plain"},
+        "body": "this response may be interrupted"
+      }
+    },
+    "chaos": {
+      "faults": {
+        "connection_drop": {
+          "probability": 0.35
+        }
+      }
+    }
+  }'
+```
+
+Semantics:
+- `chaos.faults.connection_drop.probability` is in `[0, 1]`.
+- A drop is injected when `random() < probability`.
+- The drop decision is evaluated once per matched request.
+- Faults apply across `response`, `proxy`, and `sse` action types.
+- Drops are simulated at app level by aborting mid-stream and typically surface as client transport/protocol errors.
+- During injected drops, uvicorn/server logs can show expected ASGI/protocol error messages.
+
 ## Templated Responses
 
 Response body templates use an explicit `template_body` field.
