@@ -10,7 +10,9 @@ def client():
         yield test_client
 
 
-def test_assertion_path_string_does_not_use_stub_path_parameter_matching(client: TestClient):
+def test_assertion_path_string_does_not_use_stub_path_parameter_matching(
+    client: TestClient,
+):
     client.get("/users/42")
 
     response = client.post("/__mock__/assert", json={"path": "/users/{id}"})

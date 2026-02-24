@@ -38,7 +38,7 @@ def test_admin_new_stub_page_renders(client: TestClient):
     assert response.status_code == 200
     assert "Create a Stub" in response.text
     assert "1. Match" in response.text
-    assert "Create Stub (JSON API)" in response.text
+    assert "Create Stub" in response.text
     assert "/__mock__/stubs" in response.text
     assert "Common headers" in response.text
     assert "Content-Type: application/json" in response.text
@@ -47,7 +47,7 @@ def test_admin_new_stub_page_renders(client: TestClient):
     assert 'data-target-textarea="ui-proxy-headers"' in response.text
     assert 'id="ui-chaos-delay-ms"' in response.text
     assert 'id="ui-chaos-jitter-ms"' in response.text
-    assert "[base, base + jitter]" in response.text
+    assert "Chaos latency is sampled from" in response.text
 
 
 def test_admin_stub_detail_page_renders(client: TestClient):

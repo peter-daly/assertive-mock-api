@@ -197,14 +197,14 @@ class TestStubMatching:
         parameterized_stub = Stub(
             request=StubRequest(path="/users/{id}", method=is_eq("GET")),
             action=StubAction(
-                response=StubResponse(
-                    status_code=200, headers={}, body="parameterized"
-                )
+                response=StubResponse(status_code=200, headers={}, body="parameterized")
             ),
         )
         static_stub = Stub(
             request=StubRequest(path="/users/me", method=is_eq("GET")),
-            action=StubAction(response=StubResponse(status_code=200, headers={}, body="static")),
+            action=StubAction(
+                response=StubResponse(status_code=200, headers={}, body="static")
+            ),
         )
         repo.add(parameterized_stub)
         repo.add(static_stub)
