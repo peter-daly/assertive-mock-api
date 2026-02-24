@@ -45,6 +45,7 @@ jobs:
           path: site
 
   deploy-docs:
+    if: ${{ github.event.repository.has_pages }}
     needs: build-docs
     runs-on: ubuntu-latest
     environment:
@@ -54,3 +55,14 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  pages-disabled:
+    if: ${{ !github.event.repository.has_pages }}
+    needs: build-docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: GitHub Pages is disabled
+        run: |
+          echo "GitHub Pages is not enabled for this repository."
+          echo "Enable it in Settings > Pages and set Source to GitHub Actions:"
+          echo "https://github.com/${{ github.repository }}/settings/pages"
