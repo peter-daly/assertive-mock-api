@@ -13,6 +13,7 @@ import httpx
 from assertive import Criteria, is_gte
 from pydantic import model_validator
 
+from .path_matching import PathMatcher, ensure_path_matcher
 from .templating import render_template
 
 PRACTICALLY_INFINITE = 2**31
@@ -49,6 +50,7 @@ class MockApiRequest:
     query: dict
     scope: str | None = None
     matched_stub_id: str | None = None
+    path_params: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(kw_only=True)
@@ -89,11 +91,15 @@ class StubRequest:
     """
 
     method: Criteria | None = None
-    path: Criteria | None = None
+    path: PathMatcher | Criteria | str | dict | None = None
     headers: Criteria | None = None
     body: Criteria | None = None
     host: Criteria | None = None
     query: Criteria | None = None
+
+    def __post_init__(self) -> None:
+        if self.path is not None:
+            self.path = ensure_path_matcher(self.path)
 
     class Config:
         arbitrary_types_allowed = True
@@ -214,6 +220,8 @@ class StubChaos:
 class StubMatch:
     strength: int
     stub: "Stub"
+    path_params: dict[str, str] = field(default_factory=dict)
+    path_specificity: int = 0
 
 
 @dataclass(kw_only=True)
@@ -239,8 +247,19 @@ class Stub:
             return StubMatch(strength=0, stub=self)
 
         strength = 0
-        fields_to_check = ["method", "path", "headers", "body", "host", "query"]
+        path_params: dict[str, str] = {}
+        path_specificity = 0
 
+        if self.request.path is not None:
+            path_matcher = ensure_path_matcher(self.request.path)
+            path_match = path_matcher.match(request.path)
+            if not path_match.matched:
+                return StubMatch(strength=0, stub=self)
+            strength += 1
+            path_params = path_match.params
+            path_specificity = path_match.specificity
+
+        fields_to_check = ["method", "headers", "body", "host", "query"]
         for check_field in fields_to_check:
             if getattr(self.request, check_field) is not None:
                 if getattr(request, check_field) != getattr(self.request, check_field):
@@ -252,7 +271,12 @@ class Stub:
             strength = 1
 
         self.call_count += 1
-        return StubMatch(strength=strength, stub=self)
+        return StubMatch(
+            strength=strength,
+            stub=self,
+            path_params=path_params,
+            path_specificity=path_specificity,
+        )
 
 
 class ScopeRepository:
@@ -360,11 +384,15 @@ class StubRepository:
         return False
 
     def find_best_match(self, request: MockApiRequest) -> Stub | None:
+        best_match = self.find_best_match_result(request)
+        return best_match.stub if best_match is not None else None
+
+    def find_best_match_result(self, request: MockApiRequest) -> StubMatch | None:
         """
         Finds the best match for the given request.
         """
-        best_match = None
-        best_rank = (0, -1)
+        best_match: StubMatch | None = None
+        best_rank = (0, -1, -1)
 
         for stub in self.list_for_scope(request.scope):
             match = stub.matches_request(request)
@@ -373,10 +401,10 @@ class StubRepository:
             scope_specificity = (
                 1 if request.scope is not None and stub.scope == request.scope else 0
             )
-            rank = (match.strength, scope_specificity)
+            rank = (match.strength, scope_specificity, match.path_specificity)
             if rank > best_rank:
                 best_rank = rank
-                best_match = match.stub
+                best_match = match
 
         return best_match
 
@@ -546,18 +574,21 @@ class MockApiServer:
         """
         Handles the given request and returns a response.
         """
-        best_match = self.stub_repository.find_best_match(request)
-        request.matched_stub_id = best_match.stub_id if best_match is not None else None
+        best_match = self.stub_repository.find_best_match_result(request)
+        request.matched_stub_id = (
+            best_match.stub.stub_id if best_match is not None else None
+        )
+        request.path_params = best_match.path_params if best_match is not None else {}
         self.request_log.add(request)
 
         if best_match is None:
             return MockApiResponse.no_stub_found()
 
-        delay_ms = resolve_stub_delay_ms(best_match)
+        delay_ms = resolve_stub_delay_ms(best_match.stub)
         if delay_ms > 0:
             await asyncio.sleep(delay_ms / 1000)
 
-        response = await self.response_generator.generate(best_match, request)
+        response = await self.response_generator.generate(best_match.stub, request)
         return response
 
     async def add_stub(self, stub: Stub) -> None:

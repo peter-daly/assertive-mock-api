@@ -31,6 +31,20 @@
                     }
                 }
             }
+        },
+        {
+            "request": {
+                "path": "/user/{id}"
+            },
+            "action": {
+                "response": {
+                    "status_code": 200,
+                    "headers": {
+                        "Content-Type": "application/json"
+                    },
+                    "template_body": "{\"id\":\"{{ request.path_params.id }}\",\"name\":\"Joe Bloggs\"}"
+                }
+            }
         }
     ]
 }

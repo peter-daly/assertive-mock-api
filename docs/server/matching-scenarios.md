@@ -6,7 +6,8 @@ This page shows practical matching patterns and explains how matching is powered
 
 When you send `request` or `assert` payloads to the server:
 
-- String values are converted to Assertive criteria via `ensure_criteria(...)`.
+- For stub creation (`POST /__mock__/stubs`), string `request.path` values are handled by the server path-pattern matcher (`/users/{id}` style).
+- For assertions (`POST /__mock__/assert`), string values are converted to Assertive criteria via `ensure_criteria(...)`.
 - Dict values are deserialized using `assertive.serialize.deserialize(...)`.
 - Plain dicts for `headers` and `query` are converted with `has_key_values(...)`.
 
@@ -17,7 +18,9 @@ In server code this happens in `payloads.py` through:
 - `StubRequestPayload.to_stub_request()`
 - `ApiAssertionPayload.to_api_assertion()`
 
-So matching is not simple string equality only. It is Assertive-criteria based evaluation.
+So matching is not simple string equality only:
+- Stubs use path-pattern matching for string paths plus Assertive criteria for other fields.
+- Assertions continue to use Assertive criteria evaluation.
 
 ## Scenario 1: Exact Path + Method
 
@@ -34,6 +37,18 @@ client.when_requested_with(path="/health", method="GET").respond_with(
 ```
 
 This creates criteria equivalent to Assertive equality checks for both fields.
+
+## Scenario 1b: Path Parameters
+
+```python
+client.when_requested_with(path="/users/{id}", method="GET").respond_with_template(
+    status_code=200,
+    headers={},
+    template_body="id={{ request.path_params.id }}",
+)
+```
+
+This matches `/users/42`, `/users/u_7`, etc. Captured values are available as `request.path_params`.
 
 ## Scenario 2: Header Subset Match
 
@@ -133,6 +148,9 @@ assert client.confirm_request(path="/health", method="GET") is True
 ```
 
 Assertions also use Assertive criteria through `ApiAssertionPayload -> ApiAssertion` conversion.
+
+Important: assertion `path` strings are not path-pattern strings. A payload such as
+`{"path": "/users/{id}"}` checks for that literal path string unless you use explicit criteria objects.
 
 ## Scenario 10: Times Assertions
 

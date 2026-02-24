@@ -43,3 +43,20 @@ def test_render_sse_event_templates_propagates_template_errors():
 
     with pytest.raises(TemplateRenderError):
         render_sse_event_templates(event, request)
+
+
+def test_render_sse_event_templates_can_use_path_params():
+    request = MockApiRequest(
+        path="/events/room-alpha",
+        method="GET",
+        headers={},
+        body="",
+        host="localhost",
+        query={},
+        path_params={"room_id": "room-alpha"},
+    )
+    event = SseEvent(data="room={{ request.path_params.room_id }}")
+
+    rendered = render_sse_event_templates(event, request)
+
+    assert rendered.data == "room=room-alpha"

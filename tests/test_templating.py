@@ -41,6 +41,22 @@ def test_build_template_context_parses_json_body_when_content_type_is_json():
     assert context["request"]["body"]["user"]["id"] == "u_1"
 
 
+def test_build_template_context_includes_path_params():
+    request = MockApiRequest(
+        path="/users/u_1",
+        method="GET",
+        headers={},
+        body="",
+        host="localhost",
+        query={},
+        path_params={"id": "u_1"},
+    )
+
+    context = build_template_context(request)
+
+    assert context["request"]["path_params"] == {"id": "u_1"}
+
+
 def test_build_template_context_keeps_raw_body_for_non_json_content_type():
     request = MockApiRequest(
         path="/text",

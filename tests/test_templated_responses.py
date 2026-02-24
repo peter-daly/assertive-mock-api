@@ -56,6 +56,21 @@ def test_templated_response_renders_from_query(client: TestClient):
     assert response.text == "Hello Peter"
 
 
+def test_templated_response_renders_from_path_params(client: TestClient):
+    create_response = create_stub(
+        client,
+        path="/users/{id}",
+        method="GET",
+        template_body="id={{ request.path_params.id }}",
+    )
+    assert create_response.status_code == 200
+
+    response = client.get("/users/u_9")
+
+    assert response.status_code == 200
+    assert response.text == "id=u_9"
+
+
 def test_templated_response_renders_from_json_request_body(client: TestClient):
     create_response = create_stub(
         client,

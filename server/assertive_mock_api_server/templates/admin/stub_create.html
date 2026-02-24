@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Create Stub | Mock API Admin</title>
-  <style>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create Stub | Mock API Admin</title>
+    <style>
     :root {
       --bg: #f3f6f9;
       --panel: #ffffff;
@@ -234,194 +234,285 @@
       }
     }
   </style>
-</head>
-<body>
-  <div class="page">
-    <div class="header">
-      <h1>Create a Stub</h1>
-      <a href="/__admin__">Back to Admin</a>
-    </div>
+  </head>
+  <body>
+    <div class="page">
+      <div class="header">
+        <h1>Create a Stub</h1>
+        <a href="/__admin__">Back to Admin</a>
+      </div>
 
-    <div class="card">
-      <p id="submission-message" class="notice"></p>
+      <div class="card">
+        <p id="submission-message" class="notice"></p>
 
-      <form id="stub-form" novalidate>
-        <div class="stepper" role="tablist" aria-label="Stub creation steps">
-          <button type="button" class="step-indicator active" data-step-target="0">1. Match</button>
-          <button type="button" class="step-indicator" data-step-target="1">2. Action</button>
-          <button type="button" class="step-indicator" data-step-target="2">3. Details</button>
-          <button type="button" class="step-indicator" data-step-target="3">4. Review</button>
-        </div>
-
-        <section class="step active" data-step="0">
-          <h2>Request Match</h2>
-          <p class="hint">Set simple request match values for path, method, headers, query, and body.</p>
-
-          <div class="row">
-            <label>
-              Scope (optional)
-              <input type="text" id="ui-scope" placeholder="team_a" />
-            </label>
-            <label>
-              Host matcher (optional)
-              <input type="text" id="ui-host" placeholder="localhost" />
-            </label>
+        <form id="stub-form" novalidate>
+          <div class="stepper" role="tablist" aria-label="Stub creation steps">
+            <button type="button" class="step-indicator active"
+              data-step-target="0">1. Match</button>
+            <button type="button" class="step-indicator" data-step-target="1">2.
+              Action</button>
+            <button type="button" class="step-indicator" data-step-target="2">3.
+              Details</button>
+            <button type="button" class="step-indicator" data-step-target="3">4.
+              Review</button>
           </div>
 
-          <div class="row">
-            <label>
-              Path matcher
-              <input type="text" id="ui-path" placeholder="/example" />
-            </label>
-            <label>
-              Method matcher
-              <input type="text" id="ui-method" placeholder="GET" />
-            </label>
-          </div>
+          <section class="step active" data-step="0">
+            <h2>Request Match</h2>
+            <p class="hint">Set simple request match values for path, method,
+              headers, query, and body.</p>
 
-          <label>
-            Request headers matcher (optional)
-            <div class="helper-group" data-target-textarea="ui-request-headers" aria-label="Common headers for request matcher">
-              <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="application/json">Content-Type: application/json</button>
-              <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="text/plain">Content-Type: text/plain</button>
-              <button type="button" class="helper-chip" data-header-key="Accept" data-header-value="application/json">Accept: application/json</button>
-              <button type="button" class="helper-chip" data-header-key="Authorization" data-header-value="Bearer &lt;token&gt;">Authorization: Bearer &lt;token&gt;</button>
-              <button type="button" class="helper-chip" data-header-key="Cache-Control" data-header-value="no-store">Cache-Control: no-store</button>
-              <button type="button" class="helper-chip" data-header-key="X-Request-Id" data-header-value='{"$regex":"^[A-Za-z0-9-]+$"}' aria-label='X-Request-Id regex helper'>X-Request-Id: regex</button>
+            <div class="row">
+              <label>
+                Scope (optional)
+                <input type="text" id="ui-scope" placeholder="team_a" />
+              </label>
+              <label>
+                Host matcher (optional)
+                <input type="text" id="ui-host" placeholder="localhost" />
+              </label>
             </div>
-            <p class="hint"><strong>Common headers:</strong> click a chip to insert or replace that header line.</p>
-            <textarea id="ui-request-headers" placeholder="X-Team: qa&#10;X-Request-Id: req-123"></textarea>
-            <p class="hint">One line per header using <code>Header: value</code>.</p>
-          </label>
 
-          <label>
-            Query matcher (optional)
-            <textarea id="ui-query" placeholder="q=abc&#10;page=1"></textarea>
-            <p class="hint">One line per query key using <code>name=value</code>.</p>
-          </label>
+            <div class="row">
+              <label>
+                Path matcher
+                <input type="text" id="ui-path" placeholder="/example" />
+              </label>
+              <label>
+                Method matcher
+                <input type="text" id="ui-method" placeholder="GET" />
+              </label>
+            </div>
 
-          <label>
-            Body matcher (optional)
-            <textarea id="ui-body" placeholder="plain text request body"></textarea>
-          </label>
-
-          <label>
-            Max Calls (optional)
-            <input type="number" id="ui-max-calls" min="1" />
-          </label>
-        </section>
-
-        <section class="step" data-step="1">
-          <h2>Action Type</h2>
-          <p class="hint">Choose how the stub should respond when matched.</p>
-
-          <input type="hidden" id="ui-action-type" value="response" />
-
-          <div class="action-choice" role="radiogroup" aria-label="Action type">
-            <button type="button" data-action="response">Response</button>
-            <button type="button" data-action="proxy">Proxy</button>
-            <button type="button" data-action="sse">SSE</button>
-          </div>
-        </section>
-
-        <section class="step" data-step="2">
-          <h2>Action Details</h2>
-          <p class="hint">This is UI-only input. It will be transformed into the final JSON payload.</p>
-          <div class="row">
             <label>
-              Base Delay (ms)
-              <input type="number" id="ui-chaos-delay-ms" min="0" placeholder="0" />
-            </label>
-            <label>
-              Jitter (ms)
-              <input type="number" id="ui-chaos-jitter-ms" min="0" value="0" />
-            </label>
-          </div>
-          <p class="hint">Chaos latency is sampled from <code>[base, base + jitter]</code> ms for each matched request.</p>
-
-          <div data-action-section="response">
-            <label>
-              Response Status Code
-              <input type="number" id="ui-response-status" value="200" />
-            </label>
-            <label>
-              Response Headers
-              <div class="helper-group" data-target-textarea="ui-response-headers" aria-label="Common response headers">
-                <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="application/json">Content-Type: application/json</button>
-                <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="text/plain">Content-Type: text/plain</button>
-                <button type="button" class="helper-chip" data-header-key="Accept" data-header-value="application/json">Accept: application/json</button>
-                <button type="button" class="helper-chip" data-header-key="Authorization" data-header-value="Bearer &lt;token&gt;">Authorization: Bearer &lt;token&gt;</button>
-                <button type="button" class="helper-chip" data-header-key="Cache-Control" data-header-value="no-store">Cache-Control: no-store</button>
-                <button type="button" class="helper-chip" data-header-key="X-Request-Id" data-header-value='{"$regex":"^[A-Za-z0-9-]+$"}' aria-label='X-Request-Id regex helper'>X-Request-Id: regex</button>
+              Request headers matcher (optional)
+              <div class="helper-group"
+                data-target-textarea="ui-request-headers"
+                aria-label="Common headers for request matcher">
+                <button type="button" class="helper-chip"
+                  data-header-key="Content-Type"
+                  data-header-value="application/json">Content-Type:
+                  application/json</button>
+                <button type="button" class="helper-chip"
+                  data-header-key="Content-Type"
+                  data-header-value="text/plain">Content-Type:
+                  text/plain</button>
+                <button type="button" class="helper-chip"
+                  data-header-key="Accept"
+                  data-header-value="application/json">Accept:
+                  application/json</button>
+                <button type="button" class="helper-chip"
+                  data-header-key="Authorization"
+                  data-header-value="Bearer &lt;token&gt;">Authorization: Bearer
+                  &lt;token&gt;</button>
+                <button type="button" class="helper-chip"
+                  data-header-key="Cache-Control"
+                  data-header-value="no-store">Cache-Control: no-store</button>
+                <button type="button" class="helper-chip"
+                  data-header-key="X-Request-Id"
+                  data-header-value='{"$regex":"^[A-Za-z0-9-]+$"}'
+                  aria-label='X-Request-Id regex helper'>X-Request-Id:
+                  regex</button>
               </div>
-              <p class="hint"><strong>Common headers:</strong> click a chip to insert or replace that header line.</p>
-              <textarea id="ui-response-headers" placeholder="Content-Type: application/json&#10;Cache-Control: no-store"></textarea>
-              <p class="hint">Optional. One header per line using <code>Header: value</code>.</p>
+              <p class="hint"><strong>Common headers:</strong> click a chip to
+                insert or replace that header line.</p>
+              <textarea id="ui-request-headers"
+                placeholder="X-Team: qa&#10;X-Request-Id: req-123"></textarea>
+              <p class="hint">One line per header using <code>Header:
+                  value</code>.</p>
             </label>
+
             <label>
-              Response Body
-              <textarea id="ui-response-body"></textarea>
+              Query matcher (optional)
+              <textarea id="ui-query" placeholder="q=abc&#10;page=1"></textarea>
+              <p class="hint">One line per query key using
+                <code>name=value</code>.</p>
             </label>
+
             <label>
-              Response Template Body (optional)
-              <textarea id="ui-response-template-body" placeholder="hello {{ request.path }}"></textarea>
+              Body matcher (optional)
+              <textarea id="ui-body"
+                placeholder="plain text request body"></textarea>
             </label>
+
+            <label>
+              Max Calls (optional)
+              <input type="number" id="ui-max-calls" min="1" />
+            </label>
+          </section>
+
+          <section class="step" data-step="1">
+            <h2>Action Type</h2>
+            <p class="hint">Choose how the stub should respond when matched.</p>
+
+            <input type="hidden" id="ui-action-type" value="response" />
+
+            <div class="action-choice" role="radiogroup"
+              aria-label="Action type">
+              <button type="button" data-action="response">Response</button>
+              <button type="button" data-action="proxy">Proxy</button>
+              <button type="button" data-action="sse">SSE</button>
+            </div>
+          </section>
+
+          <section class="step" data-step="2">
+            <h2>Action Details</h2>
+            <p class="hint">This is UI-only input. It will be transformed into
+              the final JSON payload.</p>
+            <div class="row">
+              <label>
+                Base Delay (ms)
+                <input type="number" id="ui-chaos-delay-ms" min="0"
+                  placeholder="0" />
+              </label>
+              <label>
+                Jitter (ms)
+                <input type="number" id="ui-chaos-jitter-ms" min="0"
+                  value="0" />
+              </label>
+            </div>
+            <p class="hint">Chaos latency is sampled from <code>[base, base +
+                jitter]</code> ms for each matched request.</p>
+
+            <div data-action-section="response">
+              <label>
+                Response Status Code
+                <input type="number" id="ui-response-status" value="200" />
+              </label>
+              <label>
+                Response Headers
+                <div class="helper-group"
+                  data-target-textarea="ui-response-headers"
+                  aria-label="Common response headers">
+                  <button type="button" class="helper-chip"
+                    data-header-key="Content-Type"
+                    data-header-value="application/json">Content-Type:
+                    application/json</button>
+                  <button type="button" class="helper-chip"
+                    data-header-key="Content-Type"
+                    data-header-value="text/plain">Content-Type:
+                    text/plain</button>
+                  <button type="button" class="helper-chip"
+                    data-header-key="Accept"
+                    data-header-value="application/json">Accept:
+                    application/json</button>
+                  <button type="button" class="helper-chip"
+                    data-header-key="Authorization"
+                    data-header-value="Bearer &lt;token&gt;">Authorization:
+                    Bearer &lt;token&gt;</button>
+                  <button type="button" class="helper-chip"
+                    data-header-key="Cache-Control"
+                    data-header-value="no-store">Cache-Control:
+                    no-store</button>
+                  <button type="button" class="helper-chip"
+                    data-header-key="X-Request-Id"
+                    data-header-value='{"$regex":"^[A-Za-z0-9-]+$"}'
+                    aria-label='X-Request-Id regex helper'>X-Request-Id:
+                    regex</button>
+                </div>
+                <p class="hint"><strong>Common headers:</strong> click a chip to
+                  insert or replace that header line.</p>
+                <textarea id="ui-response-headers"
+                  placeholder="Content-Type: application/json&#10;Cache-Control: no-store"></textarea>
+                <p class="hint">Optional. One header per line using
+                  <code>Header: value</code>.</p>
+              </label>
+              <label>
+                Response Body
+                <textarea id="ui-response-body"></textarea>
+              </label>
+              <label>
+                Response Template Body (optional)
+                <textarea id="ui-response-template-body"
+                  placeholder="hello {{ request.path }}"></textarea>
+              </label>
+            </div>
+
+            <div data-action-section="proxy">
+              <label>
+                Proxy URL
+                <input type="text" id="ui-proxy-url"
+                  placeholder="https://example.com" />
+              </label>
+              <label>
+                Proxy Headers
+                <div class="helper-group"
+                  data-target-textarea="ui-proxy-headers"
+                  aria-label="Common proxy headers">
+                  <button type="button" class="helper-chip"
+                    data-header-key="Content-Type"
+                    data-header-value="application/json">Content-Type:
+                    application/json</button>
+                  <button type="button" class="helper-chip"
+                    data-header-key="Content-Type"
+                    data-header-value="text/plain">Content-Type:
+                    text/plain</button>
+                  <button type="button" class="helper-chip"
+                    data-header-key="Accept"
+                    data-header-value="application/json">Accept:
+                    application/json</button>
+                  <button type="button" class="helper-chip"
+                    data-header-key="Authorization"
+                    data-header-value="Bearer &lt;token&gt;">Authorization:
+                    Bearer &lt;token&gt;</button>
+                  <button type="button" class="helper-chip"
+                    data-header-key="Cache-Control"
+                    data-header-value="no-store">Cache-Control:
+                    no-store</button>
+                  <button type="button" class="helper-chip"
+                    data-header-key="X-Request-Id"
+                    data-header-value='{"$regex":"^[A-Za-z0-9-]+$"}'
+                    aria-label='X-Request-Id regex helper'>X-Request-Id:
+                    regex</button>
+                </div>
+                <p class="hint"><strong>Common headers:</strong> click a chip to
+                  insert or replace that header line.</p>
+                <textarea id="ui-proxy-headers"
+                  placeholder="Authorization: Bearer token"></textarea>
+                <p class="hint">Optional. One header per line using
+                  <code>Header: value</code>.</p>
+              </label>
+              <label>
+                Proxy Timeout (seconds)
+                <input type="number" id="ui-proxy-timeout" value="5" min="1" />
+              </label>
+            </div>
+
+            <div data-action-section="sse">
+              <label>
+                SSE Default Delay (ms)
+                <input type="number" id="ui-sse-default-delay" value="0"
+                  min="0" />
+              </label>
+              <label>
+                SSE Events
+                <textarea id="ui-sse-events"
+                  placeholder="id=1; event=message; data=hello&#10;event=message; data=done; delay_ms=500">id=1; event=message; data=hello</textarea>
+                <p class="hint">One event per line. Supported keys:
+                  <code>id</code>, <code>event</code>, <code>data</code>,
+                  <code>retry</code>, <code>delay_ms</code>.</p>
+              </label>
+            </div>
+          </section>
+
+          <section class="step" data-step="3">
+            <h2>Review</h2>
+            <p class="hint">This JSON is what will be sent to
+              <code>/__mock__/stubs</code>.</p>
+            <pre id="review-output"></pre>
+          </section>
+
+          <div class="actions">
+            <button type="button" id="back-btn">Back</button>
+            <button type="button" id="next-btn" class="primary">Next</button>
+            <button type="submit" id="submit-btn" class="primary"
+              style="display:none;">Create Stub</button>
           </div>
-
-          <div data-action-section="proxy">
-            <label>
-              Proxy URL
-              <input type="text" id="ui-proxy-url" placeholder="https://example.com" />
-            </label>
-            <label>
-              Proxy Headers
-              <div class="helper-group" data-target-textarea="ui-proxy-headers" aria-label="Common proxy headers">
-                <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="application/json">Content-Type: application/json</button>
-                <button type="button" class="helper-chip" data-header-key="Content-Type" data-header-value="text/plain">Content-Type: text/plain</button>
-                <button type="button" class="helper-chip" data-header-key="Accept" data-header-value="application/json">Accept: application/json</button>
-                <button type="button" class="helper-chip" data-header-key="Authorization" data-header-value="Bearer &lt;token&gt;">Authorization: Bearer &lt;token&gt;</button>
-                <button type="button" class="helper-chip" data-header-key="Cache-Control" data-header-value="no-store">Cache-Control: no-store</button>
-                <button type="button" class="helper-chip" data-header-key="X-Request-Id" data-header-value='{"$regex":"^[A-Za-z0-9-]+$"}' aria-label='X-Request-Id regex helper'>X-Request-Id: regex</button>
-              </div>
-              <p class="hint"><strong>Common headers:</strong> click a chip to insert or replace that header line.</p>
-              <textarea id="ui-proxy-headers" placeholder="Authorization: Bearer token"></textarea>
-              <p class="hint">Optional. One header per line using <code>Header: value</code>.</p>
-            </label>
-            <label>
-              Proxy Timeout (seconds)
-              <input type="number" id="ui-proxy-timeout" value="5" min="1" />
-            </label>
-          </div>
-
-          <div data-action-section="sse">
-            <label>
-              SSE Default Delay (ms)
-              <input type="number" id="ui-sse-default-delay" value="0" min="0" />
-            </label>
-            <label>
-              SSE Events
-              <textarea id="ui-sse-events" placeholder="id=1; event=message; data=hello&#10;event=message; data=done; delay_ms=500">id=1; event=message; data=hello</textarea>
-              <p class="hint">One event per line. Supported keys: <code>id</code>, <code>event</code>, <code>data</code>, <code>retry</code>, <code>delay_ms</code>.</p>
-            </label>
-          </div>
-        </section>
-
-        <section class="step" data-step="3">
-          <h2>Review</h2>
-          <p class="hint">This JSON is what will be sent to <code>/__mock__/stubs</code>.</p>
-          <pre id="review-output"></pre>
-        </section>
-
-        <div class="actions">
-          <button type="button" id="back-btn">Back</button>
-          <button type="button" id="next-btn" class="primary">Next</button>
-          <button type="submit" id="submit-btn" class="primary" style="display:none;">Create Stub (JSON API)</button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
-  </div>
 
-  <script>
+    <script>
     (function () {
       const form = document.getElementById("stub-form");
       const steps = Array.from(document.querySelectorAll(".step"));
@@ -875,5 +966,5 @@
       renderStep();
     }());
   </script>
-</body>
+  </body>
 </html>

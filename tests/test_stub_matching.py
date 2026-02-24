@@ -191,3 +191,56 @@ class TestStubMatching:
     def test_delete_by_id_returns_false_for_missing_stub(self):
         repo = StubRepository()
         assert repo.delete_by_id("missing-stub-id") is False
+
+    def test_static_path_out_ranks_parameterized_path_on_tie(self):
+        repo = StubRepository()
+        parameterized_stub = Stub(
+            request=StubRequest(path="/users/{id}", method=is_eq("GET")),
+            action=StubAction(
+                response=StubResponse(
+                    status_code=200, headers={}, body="parameterized"
+                )
+            ),
+        )
+        static_stub = Stub(
+            request=StubRequest(path="/users/me", method=is_eq("GET")),
+            action=StubAction(response=StubResponse(status_code=200, headers={}, body="static")),
+        )
+        repo.add(parameterized_stub)
+        repo.add(static_stub)
+
+        request = MockApiRequest(
+            path="/users/me",
+            method="GET",
+            headers={},
+            body=None,
+            host="localhost",
+            query={},
+        )
+
+        result = repo.find_best_match(request)
+
+        assert result == static_stub
+
+    def test_criteria_backed_path_matcher_still_matches(self):
+        repo = StubRepository()
+        stub = Stub(
+            request=StubRequest(path=is_eq("/criteria-path")),
+            action=StubAction(
+                response=StubResponse(status_code=200, headers={}, body="criteria")
+            ),
+        )
+        repo.add(stub)
+
+        request = MockApiRequest(
+            path="/criteria-path",
+            method="GET",
+            headers={},
+            body=None,
+            host="localhost",
+            query={},
+        )
+
+        result = repo.find_best_match(request)
+
+        assert result == stub

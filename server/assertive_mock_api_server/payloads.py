@@ -16,11 +16,11 @@ from .core import (
     SseStream,
     ApiAssertion,
 )
+from .path_matching import ensure_path_matcher, serialize_path_matcher
 
 
 def ensure_str_criteria(data: str | dict | Criteria) -> Criteria:
-    item = deserialize(data)
-    return ensure_criteria(item)
+    return deserialize(data)
 
 
 def ensure_dict_criteria(data: dict | Criteria) -> Criteria:
@@ -222,7 +222,9 @@ class StubRequestPayload(BaseModel):
         """
         return cls(
             method=serialize(request.method) if request.method else None,
-            path=serialize(request.path) if request.path else None,
+            path=serialize_path_matcher(ensure_path_matcher(request.path))
+            if request.path
+            else None,
             body=serialize(request.body) if request.body else None,
             headers=serialize(request.headers) if request.headers else None,
             host=serialize(request.host) if request.host else None,
@@ -236,7 +238,7 @@ class StubRequestPayload(BaseModel):
         kwargs = {}
 
         if self.path is not None:
-            kwargs["path"] = ensure_str_criteria(self.path)
+            kwargs["path"] = ensure_path_matcher(self.path)
 
         if self.method is not None:
             kwargs["method"] = ensure_str_criteria(self.method)

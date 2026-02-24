@@ -60,6 +60,7 @@ def build_template_context(request: "MockApiRequest") -> dict[str, Any]:
     return {
         "request": {
             "path": request.path,
+            "path_params": request.path_params,
             "method": request.method,
             "host": request.host,
             "scope": request.scope,

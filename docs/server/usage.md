@@ -17,6 +17,11 @@ curl -X POST http://localhost:8910/__mock__/stubs \
   }'
 ```
 
+Path matcher note:
+- String `request.path` values on stub creation support named path params using `{name}` segments.
+- Example: `"/users/{id}"` matches `"/users/42"` and `"/users/alice"`.
+- Path matching is exact-depth (same number of path segments).
+
 ## Confirm a Request Happened
 
 ```bash
@@ -123,6 +128,25 @@ curl -X POST http://localhost:8910/__mock__/stubs \
 curl "http://localhost:8910/hello?name=Peter"
 ```
 
+Use path params captured from path-pattern matching:
+
+```bash
+curl -X POST http://localhost:8910/__mock__/stubs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request": {"path": "/users/{id}", "method": "GET"},
+    "action": {
+      "response": {
+        "status_code": 200,
+        "headers": {"Content-Type": "text/plain"},
+        "template_body": "user id: {{ request.path_params.id }}"
+      }
+    }
+  }'
+
+curl http://localhost:8910/users/u_123
+```
+
 For JSON requests, `request.body` is parsed JSON and can be accessed by field:
 
 ```bash
@@ -227,3 +251,7 @@ Notes:
 ## More Matching Patterns
 
 For detailed examples across path/method/header/query/body/scope and an explanation of how Assertive criteria are used under the hood, see [Matching Scenarios](matching-scenarios.md).
+
+Assertion note:
+- `POST /__mock__/assert` keeps Assertive criteria semantics for `path`.
+- A string like `"/users/{id}"` is treated as a literal assertion path unless you send explicit criteria payloads.
