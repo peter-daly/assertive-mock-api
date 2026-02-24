@@ -5,9 +5,7 @@ Use this compose file to run the server on port `8910`.
 ```yaml
 services:
   assertive-mock-api-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/peter-daly/assertive-mock-api/server:latest
     ports:
       - "8910:8910"
 ```
@@ -15,7 +13,7 @@ services:
 ## Start
 
 ```bash
-docker compose up --build
+docker compose up
 ```
 
 ## Health Check
