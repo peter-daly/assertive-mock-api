@@ -22,6 +22,22 @@ So matching is not simple string equality only:
 - Stubs use path-pattern matching for string paths plus Assertive criteria for other fields.
 - Assertions continue to use Assertive criteria evaluation.
 
+When multiple stubs match a request, the server ranks them in this order:
+
+1. Matched field count (absolute number of configured fields that matched).
+2. Weighted score (sum of matched field weights).
+3. Scope specificity (scoped match over global match).
+4. Path specificity (more literal path segments wins over parameterized path).
+
+Default weights:
+
+- `path`: `79`
+- `method`: `37`
+- `body`: `17`
+- `host`: `7`
+- `query`: `3`
+- `headers`: `2`
+
 ## Scenario 1: Exact Path + Method
 
 ```python
@@ -109,7 +125,7 @@ client.when_requested_with(path="/users", method="GET").respond_with(
 )
 ```
 
-The server picks the strongest match (more matched fields).
+The server picks the strongest match using count-first ranking, then weighted score as a tie-breaker.
 
 ## Scenario 7: Max Calls
 

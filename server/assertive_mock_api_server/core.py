@@ -18,6 +18,14 @@ from .templating import render_template
 
 PRACTICALLY_INFINITE = 2**31
 SCOPE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]+$")
+FIELD_WEIGHTS: dict[str, int] = {
+    "path": 79,
+    "method": 37,
+    "body": 17,
+    "host": 7,
+    "query": 3,
+    "headers": 2,
+}
 
 
 class ScopeAlreadyExistsError(ValueError):
@@ -235,6 +243,7 @@ class StubChaos:
 class StubMatch:
     strength: int
     stub: "Stub"
+    weighted_strength: int = 0
     path_params: dict[str, str] = field(default_factory=dict)
     path_specificity: int = 0
 
@@ -259,9 +268,10 @@ class Stub:
         Check if the request matches the stub.
         """
         if self.call_count >= self.max_calls:
-            return StubMatch(strength=0, stub=self)
+            return StubMatch(strength=0, weighted_strength=0, stub=self)
 
         strength = 0
+        weighted_strength = 0
         path_params: dict[str, str] = {}
         path_specificity = 0
 
@@ -269,8 +279,9 @@ class Stub:
             path_matcher = ensure_path_matcher(self.request.path)
             path_match = path_matcher.match(request.path)
             if not path_match.matched:
-                return StubMatch(strength=0, stub=self)
+                return StubMatch(strength=0, weighted_strength=0, stub=self)
             strength += 1
+            weighted_strength += FIELD_WEIGHTS["path"]
             path_params = path_match.params
             path_specificity = path_match.specificity
 
@@ -278,16 +289,19 @@ class Stub:
         for check_field in fields_to_check:
             if getattr(self.request, check_field) is not None:
                 if getattr(request, check_field) != getattr(self.request, check_field):
-                    return StubMatch(strength=0, stub=self)
+                    return StubMatch(strength=0, weighted_strength=0, stub=self)
                 strength += 1
+                weighted_strength += FIELD_WEIGHTS[check_field]
 
         # A stub with no match predicates is a valid catch-all match.
         if strength == 0:
             strength = 1
+            weighted_strength = 1
 
         self.call_count += 1
         return StubMatch(
             strength=strength,
+            weighted_strength=weighted_strength,
             stub=self,
             path_params=path_params,
             path_specificity=path_specificity,
@@ -407,7 +421,7 @@ class StubRepository:
         Finds the best match for the given request.
         """
         best_match: StubMatch | None = None
-        best_rank = (0, -1, -1)
+        best_rank = (0, 0, -1, -1)
 
         for stub in self.list_for_scope(request.scope):
             match = stub.matches_request(request)
@@ -416,7 +430,12 @@ class StubRepository:
             scope_specificity = (
                 1 if request.scope is not None and stub.scope == request.scope else 0
             )
-            rank = (match.strength, scope_specificity, match.path_specificity)
+            rank = (
+                match.strength,
+                match.weighted_strength,
+                scope_specificity,
+                match.path_specificity,
+            )
             if rank > best_rank:
                 best_rank = rank
                 best_match = match

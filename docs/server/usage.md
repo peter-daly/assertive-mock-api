@@ -22,6 +22,20 @@ Path matcher note:
 - Example: `"/users/{id}"` matches `"/users/42"` and `"/users/alice"`.
 - Path matching is exact-depth (same number of path segments).
 
+Match ranking note:
+- If multiple stubs match, ranking is:
+  1. Matched field count
+  2. Weighted score
+  3. Scope specificity
+  4. Path specificity
+- Default field weights:
+  - `path`: `79`
+  - `method`: `37`
+  - `body`: `17`
+  - `host`: `7`
+  - `query`: `3`
+  - `headers`: `2`
+
 ## Confirm a Request Happened
 
 ```bash

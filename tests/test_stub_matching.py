@@ -86,6 +86,74 @@ class TestStubMatching:
         # Assert
         assert result == strong_stub
 
+    def test_match_count_beats_weighted_score(self):
+        repo = StubRepository()
+        high_weight_two_field_stub = Stub(
+            request=StubRequest(path="/rank", method=is_eq("GET")),
+            action=StubAction(
+                response=StubResponse(status_code=200, headers={}, body="high-weight")
+            ),
+        )
+        high_count_three_field_stub = Stub(
+            request=StubRequest(
+                method=is_eq("GET"),
+                headers=is_eq({"x-env": "test"}),
+                query=is_eq({"page": "1"}),
+            ),
+            action=StubAction(
+                response=StubResponse(status_code=200, headers={}, body="high-count")
+            ),
+        )
+        repo.add(high_weight_two_field_stub)
+        repo.add(high_count_three_field_stub)
+
+        request = MockApiRequest(
+            path="/rank",
+            method="GET",
+            headers={"x-env": "test"},
+            body=None,
+            host="localhost",
+            query={"page": "1"},
+        )
+
+        result = repo.find_best_match(request)
+
+        assert result == high_count_three_field_stub
+
+    def test_weighted_score_breaks_tie_when_match_count_is_equal(self):
+        repo = StubRepository()
+        higher_weight_stub = Stub(
+            request=StubRequest(path="/weights", host=is_eq("localhost")),
+            action=StubAction(
+                response=StubResponse(
+                    status_code=200, headers={}, body="higher-weighted-score"
+                )
+            ),
+        )
+        lower_weight_stub = Stub(
+            request=StubRequest(method=is_eq("GET"), body=is_eq("payload")),
+            action=StubAction(
+                response=StubResponse(
+                    status_code=200, headers={}, body="lower-weighted-score"
+                )
+            ),
+        )
+        repo.add(higher_weight_stub)
+        repo.add(lower_weight_stub)
+
+        request = MockApiRequest(
+            path="/weights",
+            method="GET",
+            headers={},
+            body="payload",
+            host="localhost",
+            query={},
+        )
+
+        result = repo.find_best_match(request)
+
+        assert result == higher_weight_stub
+
     def test_find_best_match_reached_max_calls(self):
         # Setup
         repo = StubRepository()
@@ -140,6 +208,43 @@ class TestStubMatching:
 
         # Assert
         assert result is None
+
+    def test_catch_all_is_weakest_positive_match(self):
+        repo = StubRepository()
+        catch_all_stub = Stub(
+            request=StubRequest(),
+            action=StubAction(
+                response=StubResponse(status_code=200, headers={}, body="catch-all")
+            ),
+        )
+        specific_stub = Stub(
+            request=StubRequest(path="/only-this"),
+            action=StubAction(
+                response=StubResponse(status_code=200, headers={}, body="specific")
+            ),
+        )
+        repo.add(catch_all_stub)
+        repo.add(specific_stub)
+
+        specific_request = MockApiRequest(
+            path="/only-this",
+            method="GET",
+            headers={},
+            body=None,
+            host="localhost",
+            query={},
+        )
+        catch_all_request = MockApiRequest(
+            path="/somewhere-else",
+            method="GET",
+            headers={},
+            body=None,
+            host="localhost",
+            query={},
+        )
+
+        assert repo.find_best_match(specific_request) == specific_stub
+        assert repo.find_best_match(catch_all_request) == catch_all_stub
 
     def test_stubs_have_unique_ids(self):
         repo = StubRepository()
