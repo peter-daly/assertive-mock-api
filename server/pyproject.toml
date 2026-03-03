@@ -1,6 +1,6 @@
 [project]
 name = "assertive-mock-api-server"
-version = "1.4.0"
+version = "1.5.0"
 description = "Assertive mock API server"
 keywords = ["mock-api", "api-testing", "fastapi", "stub-server", "contract-testing"]
 requires-python = ">=3.10"
