@@ -182,7 +182,7 @@ class _PreActionedStub:
         self,
         *,
         status_code: int,
-        headers: dict,
+        headers: dict = {},
         template_body: str,
         max_calls: int | None = None,
     ) -> None:
@@ -255,6 +255,8 @@ class MockApiClient:
         self.base_url = base_url
         self._scope_name = scope_name
         self._scope_header_value = scope_header_value
+        self._in_session = False
+        self._session_stubs: list[str] = []
 
     def _scope_headers(self) -> dict[str, str]:
         if self._scope_name is None:
@@ -269,10 +271,27 @@ class MockApiClient:
     def delete_scope(self, name: str) -> None:
         response = httpx.delete(f"{self.base_url}/__mock__/scopes/{name}")
         response.raise_for_status()
+        self._scope_name = None
+
+    def close_session(self) -> None:
+        for stub_id in self._session_stubs:
+            response = httpx.delete(f"{self.base_url}/__mock__/stubs/{stub_id}")
+            response.raise_for_status()
+
+    @contextmanager
+    def new_session(self):
+        if self._in_session:
+            raise RuntimeError("Nested sessions are not supported")
+
+        try:
+            self._in_session = True
+            yield self
+        finally:
+            self.close_session()
 
     @contextmanager
     def new_scope(self, scope_name: str):
-        if self._scope_name is not None:
+        if self._in_session or self._scope_name is not None:
             raise RuntimeError("Nested scopes are not supported")
 
         self.create_scope(scope_name)
@@ -334,6 +353,10 @@ class MockApiClient:
         )
 
         response.raise_for_status()
+
+        if self._in_session:
+            stub_id = response.json()["stub_id"]
+            self._session_stubs.append(stub_id)
 
     def confirm_request(
         self,
