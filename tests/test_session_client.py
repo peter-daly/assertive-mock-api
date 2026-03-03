@@ -34,30 +34,35 @@ def test_new_session_enter_and_exit_calls_endpoints(monkeypatch):
     monkeypatch.setattr("httpx.delete", fake_delete)
 
     client = MockApiClient("http://localhost:8910")
-    with client.new_session() as session:
-        assert isinstance(session, MockApiClient)
-        session.when_requested_with(method="GET", path="/test/1").respond_with_json(
-            status_code=200, body={"success": True}
-        )
-        session.when_requested_with(method="GET", path="/test/2").respond_with_template(
-            status_code=200, template_body="I am i template."
-        )
-        session.when_requested_with(method="GET", path="/test/2").respond_with_sse(
-            events=[{"data": "foo"}]
-        )
 
-    assert calls[0][0] == "POST"
-    assert calls[0][1].endswith("/__mock__/stubs")
-    assert calls[1][0] == "POST"
-    assert calls[1][1].endswith("/__mock__/stubs")
-    assert calls[2][0] == "POST"
-    assert calls[2][1].endswith("/__mock__/stubs")
-    assert calls[3][0] == "DELETE"
-    assert calls[3][1].endswith(f"/__mock__/stubs/{stub_ids[0]}")
-    assert calls[4][0] == "DELETE"
-    assert calls[4][1].endswith(f"/__mock__/stubs/{stub_ids[1]}")
-    assert calls[5][0] == "DELETE"
-    assert calls[5][1].endswith(f"/__mock__/stubs/{stub_ids[2]}")
+    # loop a few times to mock this being called in a test with enumeration
+    for _ in range(100):
+        with client.new_session() as session:
+            assert isinstance(session, MockApiClient)
+            session.when_requested_with(method="GET", path="/test/1").respond_with_json(
+                status_code=200, body={"success": True}
+            )
+            session.when_requested_with(method="GET", path="/test/2").respond_with_template(
+                status_code=200, template_body="I am i template."
+            )
+            session.when_requested_with(method="GET", path="/test/2").respond_with_sse(
+                events=[{"data": "foo"}]
+            )
+
+        assert calls[0][0] == "POST"
+        assert calls[0][1].endswith("/__mock__/stubs")
+        assert calls[1][0] == "POST"
+        assert calls[1][1].endswith("/__mock__/stubs")
+        assert calls[2][0] == "POST"
+        assert calls[2][1].endswith("/__mock__/stubs")
+        assert calls[3][0] == "DELETE"
+        assert calls[3][1].endswith(f"/__mock__/stubs/{stub_ids[0]}")
+        assert calls[4][0] == "DELETE"
+        assert calls[4][1].endswith(f"/__mock__/stubs/{stub_ids[1]}")
+        assert calls[5][0] == "DELETE"
+        assert calls[5][1].endswith(f"/__mock__/stubs/{stub_ids[2]}")
+        stub_ids = []
+        calls = []
 
 
 def test_nested_sessions_on_session_are_disallowed():

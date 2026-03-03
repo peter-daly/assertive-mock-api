@@ -277,6 +277,8 @@ class MockApiClient:
         for stub_id in self._session_stubs:
             response = httpx.delete(f"{self.base_url}/__mock__/stubs/{stub_id}")
             response.raise_for_status()
+        self._in_session = False
+        self._session_stubs = []
 
     @contextmanager
     def new_session(self):
