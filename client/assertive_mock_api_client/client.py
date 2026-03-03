@@ -182,13 +182,16 @@ class _PreActionedStub:
         self,
         *,
         status_code: int,
-        headers: dict = {},
+        headers: dict | None = None,
         template_body: str,
         max_calls: int | None = None,
     ) -> None:
         """
         Responds with a rendered template body.
         """
+        if headers is None:
+            headers = {}
+
         response = StubResponsePayload(
             status_code=status_code,
             headers=headers,
@@ -203,9 +206,12 @@ class _PreActionedStub:
         *,
         status_code: int,
         body: dict,
-        headers: dict = {},
+        headers: dict | None = None,
         max_calls: int | None = None,
     ) -> None:
+        if headers is None:
+            headers = {}
+
         return self.respond_with(
             status_code=status_code,
             headers={"Content-Type": "application/json", **headers},
