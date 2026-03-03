@@ -3,11 +3,9 @@ import json
 from typing import cast
 
 import pytest
-from fastapi.responses import JSONResponse, Response, StreamingResponse
-
 from assertive_mock_api_server.app import (
-    _build_drop_connection_response,
     _build_connection_drop_response,
+    _build_drop_connection_response,
     _build_sse_response,
     _build_standard_response,
     _template_render_error_response,
@@ -20,6 +18,7 @@ from assertive_mock_api_server.core import (
     SseEvent,
 )
 from assertive_mock_api_server.templating import TemplateRenderError
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 
 async def _read_stream(response: StreamingResponse) -> bytes:

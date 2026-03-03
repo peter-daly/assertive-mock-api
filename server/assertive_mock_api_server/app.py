@@ -11,15 +11,15 @@ from fastapi.templating import Jinja2Templates
 
 from assertive_mock_api_server.container import get_container
 from assertive_mock_api_server.core import (
-    SseEvent,
     MockApiDropConnectionResponse,
-    MockApiResponse,
-    MockApiSseResponse,
     MockApiRequest,
+    MockApiResponse,
     MockApiServer,
+    MockApiSseResponse,
     ScopeAlreadyExistsError,
     ScopeNotFoundError,
     ScopeRepository,
+    SseEvent,
     encode_sse_event,
     resolve_sse_delay_ms,
 )
@@ -447,8 +447,9 @@ async def add_stub(
     scope_repository=Resolve(ScopeRepository),
 ):
     scope = resolve_scope_from_headers(dict(request.headers), scope_repository)
-    await mock_server.add_stub(stub_payload.to_stub(scope=scope))
-    return {"success": True}
+    stub = stub_payload.to_stub(scope=scope)
+    await mock_server.add_stub(stub)
+    return {"success": True, "stub_id": stub.stub_id}
 
 
 @app.post("/__mock__/assert")
