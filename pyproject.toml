@@ -8,7 +8,7 @@ dev = [
     "pymdown-extensions>=10.16",
     "pytest>=8.4.1",
     "ruff>=0.12.5",
-    "ty>=0.0.18",
+    "ty>=0.0.29",
 ]
 
 [tool.ty.environment]
